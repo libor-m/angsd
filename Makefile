@@ -19,7 +19,7 @@ bfgs.o: bfgs.cpp bfgs.h
 analysisFunction.o: analysisFunction.cpp analysisFunction.h shared.o
 	$(CXX) $(FLAGS) -c analysisFunction.cpp
 
-analysisKeepList.o: analysisKeepList.h analysisKeepList.cpp analysisFunction.o shared.o
+analysisKeepList.o: analysisKeepList.h analysisKeepList.cpp analysisFunction.o shared.o keepToBin.cpp bams.h
 	$(CXX) $(FLAGS) -c analysisKeepList.cpp
 
 

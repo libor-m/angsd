@@ -3,6 +3,10 @@
   it is not faster to thread the cleaning.
   
   added howOften,nQueue
+
+  idea for improvement.
+  1. make blockwise threading of the indexed iteration
+
   
  */
 
@@ -85,7 +89,7 @@ void init(argStruct *arguments){
   
   
   //  fprintf(stderr,"[%s] \n",__FILE__);
-  fprintf(stderr,"\t->Starting analysis\n");
+  fprintf(stderr,"\t-> Starting analysis\n");
   header = arguments->hd;
   pthread_attr_init(&attr);
   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
@@ -268,8 +272,17 @@ void master(funkyPars *p){
   // pthread_detach(thread1);
 }
 
-void waiter(){
-  
+
+void changeChr(int refId){
+  ((filter *)allMethods[0])->readSites(refId);//<-used for filter if -doFilter==2 and -filter with .keep
+
+
+}
+
+
+void waiter(int refId){
+  //  fprintf(stderr,"waiter: start\n");
+  //fflush(stderr);
   //change of chr detected wait untill all threads are done
   if(allMethods[0]->header->n_ref<THRESHOLD_FOR_NICEOUTPUT)
     fprintf(stderr,"Change of chromo detected Waiting for nThreads:%d\n",curRunning);
@@ -286,13 +299,17 @@ void waiter(){
     pthread_mutex_unlock(&counterMut);
     sleep(1);
   }
-  
+  changeChr(refId);
+
+  // fprintf(stderr,"waiter: stop\n");
+  //fflush(stderr);
+
   //  currentChr = p->refId;
-  ((filter *)allMethods[0])->readSites();//<-used for filter if -doFilter==2 and -filter with .keep
+  
   //chunkNumber =1;//<-lets not reset the chkId the printqueue might get confused. 
-  
-  
 }
+
+
 
 
 /*

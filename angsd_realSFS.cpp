@@ -26,6 +26,7 @@ namespace filipe{
 
 class realSFS : public general{
   int doRealSFS;
+  int doSFS;
   FILE *outfileSFS;
   FILE *outfileSFSPOS;
   gzFile fpgz;
@@ -70,7 +71,7 @@ void realSFS::printArg(FILE *argFile){
   fprintf(argFile,"\t-fold\t\t\t%d (deprecated)\n",fold);
   fprintf(argFile,"\t-anc\t\t\t%s (ancestral fasta)\n",anc);
   fprintf(argFile,"\t-noTrans\t\t%d (remove transitions)\n",noTrans);
-  
+  fprintf(argFile,"-\t-doSFS\t\t%d\t(Using genotype posteriors (untested))\n",doSFS);
   fprintf(argFile,"\t-pest\t\t\t%s (prior SFS)\n",pest);
   fprintf(argFile,"\n");
 
@@ -121,12 +122,13 @@ double lbico(double n, double k){
 
 void realSFS::getOptions(argStruct *arguments){
   doRealSFS=angsd::getArg("-realSFS",doRealSFS,arguments);
+  doSFS=angsd::getArg("-doSFS",doSFS,arguments);
   noTrans = angsd::getArg("-noTrans",noTrans,arguments);
   pest = angsd::getArg("-pest",pest,arguments);
   int GL = 0;
   GL = angsd::getArg("-GL",GL,arguments);
   doThetas= angsd::getArg("-doThetas",doThetas,arguments);
-  if(doRealSFS==0&&doThetas==0)
+  if(doRealSFS==0&&doThetas==0&&doSFS==0)
     return;
 
   underFlowProtect=angsd::getArg("-underFlowProtect",underFlowProtect,arguments);
@@ -191,7 +193,7 @@ realSFS::realSFS(const char *outfiles,argStruct *arguments,int inputtype){
   pest=NULL;
   noTrans = 0;
   prior = NULL;
-
+  doSFS =0;
   doRealSFS=0;
   doThetas = 0;
   outfileSFS = NULL;
@@ -211,9 +213,9 @@ realSFS::realSFS(const char *outfiles,argStruct *arguments,int inputtype){
   getOptions(arguments);
   printArg(arguments->argumentFile);  
   
-  if(doRealSFS==0)
+  if(doRealSFS==0&&doSFS==0)
     return;
-  if(doRealSFS!=0&&doThetas==0){
+  if((doSFS!=0||doRealSFS!=0)&&doThetas==0){
     outfileSFS =  openFile(outfiles,SFS);
     outfileSFSPOS =  openFile(outfiles,SFSPOS);
   }else{
@@ -248,6 +250,27 @@ realSFS::~realSFS(){
     fclose(outfileSFSPOS);
   }else if(doRealSFS!=0&&doThetas==1)
     gzclose(fpgz);
+}
+
+
+void normalize_array(double *d, int len){
+  double s =0;
+  for(int i=0;i<len;i++)
+    s+=d[i];
+
+  for(int i=0;i<len;i++)
+    d[i]=d[i]/s;
+}
+
+
+void normalize_array2(double *d, int len){
+  double s =0;
+  for(int i=0;i<len;i++)
+    s+=exp(d[i]);
+  s=log(s);
+
+  for(int i=0;i<len;i++)
+    d[i]=d[i]-s;
 }
 
 
@@ -498,6 +521,49 @@ void filipe::algoJoint(double **liks,char *anc,int nsites,int numInds,int underF
   
 }
 
+void algoJointPost(double **post,int nSites,int nInd,int *keepSites,realRes *r,int doFold){
+  int myCounter =0;
+  for(int s=0;s<nSites;s++){
+    if(keepSites[s]==0)
+      continue;
+    double *liks=post[s]; //we call this liks, eventhough it is posteriors.
+    double *hj = new double [2*nInd+1];
+    for(int index=0;index<(2*nInd+1);index++)
+      hj[index]=0;
+    //initalize
+    memcpy(hj,liks,3*sizeof(double));
+    
+    for(int i=1 ; i<nInd ;i++) {
+      double Paa=liks[i*3];
+      double PAa=2*liks[i*3+1];
+      double PAA=liks[i*3+2];
+      for(int j=2*(i+1); j>1;j--)
+	hj[j] = PAA*hj[j-2]+PAa*hj[j-1]+Paa*hj[j];
+      hj[1] = Paa*hj[1] + PAa*hj[0];
+      hj[0] = Paa*hj[0];
+      
+      normalize_array(hj,2*(i+1));
+    }
+    for(int i=0;i<(2*nInd+1);i++)
+      hj[i] =  log(hj[i])-lbico(2*nInd,i);
+    int newDim = 2*nInd+1;
+    
+    if(doFold){
+      newDim=nInd+1;
+      for(int i=0;i<newDim-1;i++)// we shouldn't touch the last element
+	hj[i] = log(exp(hj[i]) + exp(hj[2*nInd-i]));
+      hj[newDim-1] = hj[newDim-1]+log(2.0);
+    }
+    angsd::logrescale(hj,2*nInd+1);
+    if(std::isnan(hj[0]))
+      r->oklist[s] = 2;
+    else{
+      r->oklist[s] = 1;
+      r->pLikes[myCounter] =hj;
+      myCounter++;
+    }
+  }
+}
 
 
 void algoJoint(double **liks,char *anc,int nsites,int numInds,int underFlowProtect, int fold,int *keepSites,realRes *r,int noTrans) {
@@ -689,27 +755,6 @@ void algoJoint(double **liks,char *anc,int nsites,int numInds,int underFlowProte
 }
 
 
-void normalize_array(double *d, int len){
-  double s =0;
-  for(int i=0;i<len;i++)
-    s+=d[i];
-
-  for(int i=0;i<len;i++)
-    d[i]=d[i]/s;
-}
-
-
-void normalize_array2(double *d, int len){
-  double s =0;
-  for(int i=0;i<len;i++)
-    s+=exp(d[i]);
-  s=log(s);
-
-  for(int i=0;i<len;i++)
-    d[i]=d[i]-s;
-}
-
-
 
 //Basicly the same as algoBayAll but only looping through the 3 derived given that an ancestral exists;
 
@@ -731,26 +776,27 @@ void print_array(FILE *fp,double *ary,int len,int doLogTransform){
 
 
 void realSFS::run(funkyPars  *p){
-  if(doRealSFS==0||p->numSites==0)
+  if(p->numSites==0||(doRealSFS==0 && doSFS==0))
     return;
-  else if(doRealSFS==1||doRealSFS==2){
-    realRes *r = new realRes;
-    r->oklist=new char[p->numSites];
-    memset(r->oklist,0,p->numSites);
-    r->pLikes=new double*[p->numSites];
-    if(doRealSFS==1)
-      algoJoint(p->likes,p->anc,p->numSites,p->nInd,underFlowProtect,fold,p->keepSites,r,noTrans);
-    else
-      filipe::algoJoint(p->likes,p->anc,p->numSites,p->nInd,underFlowProtect,fold,p->keepSites,r,noTrans,doRealSFS,p->major,p->minor,p->results->asso->freq,filipeIndF);
-    p->extras[index] = r;
-  }else{
-    fprintf(stderr,"unsupported realSFS arg=%d\n",doRealSFS);
-  }
+  
+  realRes *r = new realRes;
+  r->oklist=new char[p->numSites];
+  memset(r->oklist,0,p->numSites);
+  r->pLikes=new double*[p->numSites];
+  
+  if(doRealSFS==1)
+    algoJoint(p->likes,p->anc,p->numSites,p->nInd,underFlowProtect,fold,p->keepSites,r,noTrans);
+  else if(doRealSFS==2)
+    filipe::algoJoint(p->likes,p->anc,p->numSites,p->nInd,underFlowProtect,fold,p->keepSites,r,noTrans,doRealSFS,p->major,p->minor,p->results->asso->freq,filipeIndF);
+  
+  if(doSFS)
+    algoJointPost(p->post,p->numSites,p->nInd,p->keepSites,r,fold);
 
+  p->extras[index] = r;
 }
 
 void realSFS::clean(funkyPars *p){
- if(doRealSFS==0||p->numSites==0)
+  if(p->numSites==0||(doRealSFS==0 && doSFS==0))
     return;
  
   realRes *r=(realRes *) p->extras[index];
@@ -832,13 +878,16 @@ void realSFS::fin(funkyPars *pars,int index,double *prior,gzFile fpgz){
 
 
 void realSFS::print(funkyPars *p){
- if(doRealSFS==0||p->numSites==0)
+  if(p->numSites==0||(doRealSFS==0 && doSFS==0))
     return;
  
  if(doRealSFS>0&&prior==NULL)
    printFull(p,index,outfileSFS,outfileSFSPOS,header->name[p->refId],fold);
  else if(doThetas==1&&doRealSFS==1&&prior!=NULL)
    fin(p,index,prior,fpgz);
+ 
+ if(doSFS>0&&prior==NULL)
+   printFull(p,index,outfileSFS,outfileSFSPOS,header->name[p->refId],fold);
 }
 
 

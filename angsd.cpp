@@ -22,7 +22,7 @@
 #include "shared.h"
 #include "multiReader.h"
 #include "mrStruct.h"
-#define VERSION 0.539
+#define VERSION 0.540
 #define ARGS ".arg"
 
 #include "parseArgs_bambi.h"
@@ -145,28 +145,31 @@ argStruct *setArgStruct(int argc,char **argv) {
   arguments->hd = NULL;
   arguments->argc=argc;
   arguments->argv=argv;
-  arguments->usedArgs= new int[argc];
+  arguments->usedArgs= new int[argc+1];//well here we allocate one more than needed, this is only used in the ./angsd -beagle version
   for(int i=0;i<argc;i++)
     arguments->usedArgs[i]=0;
   
   arguments->inputtype=-1;
   
-  if(argc==2)//if help should be printed
+  if(0&&argc==2)//if help should be printed
     return arguments;
 
   int argPos = 1;
-  while(argPos <argc) { 
+  int extra= argc==2?1:0;
+  //  fprintf(stderr,"argpos=%d cond=%d\n",argPos,argc+extra);
+  while(argPos <argc+extra) { 
+    //fprintf(stderr,"argv[%d]=%s\n",argPos,argv[argPos]);
     if (strcmp(argv[argPos],"-samglf")==0)
       arguments->inputtype=1;
     else if (strcmp(argv[argPos],"-samglfclean")==0)
       arguments->inputtype=2;
-     else if (strcmp(argv[argPos],"-sim1")==0)
+    else if (strcmp(argv[argPos],"-sim1")==0)
       arguments->inputtype=4;
     else if (strcmp(argv[argPos],"-beagle")==0){
-       arguments->inputtype=5;
-       arguments->usedArgs[argPos]=1;
-       arguments->usedArgs[argPos+1]=1;
-     }
+      arguments->inputtype=5;
+      arguments->usedArgs[argPos]=1;
+      arguments->usedArgs[argPos+1]=1;
+    }
      else if (strcmp(argv[argPos],"-soap")==0){
        arguments->inputtype=0;
        arguments->usedArgs[argPos]=1;
@@ -182,6 +185,8 @@ argStruct *setArgStruct(int argc,char **argv) {
        arguments->usedArgs[argPos+1]=1;
      }
      else if(strcmp(argv[argPos],"-bam")==0||strcmp(argv[argPos],"-i")==0 ){
+       if(argc==2)
+	 break;
        if(strcmp(argv[argPos],"-bam")==0){
 	 getNind(argv[argPos+1],arguments);
 	 char buftmp[1024];//fix this if user gives a bam instead of a bam filelist
@@ -281,8 +286,8 @@ void splitFunkyPars(mr::funkyPars *fp,std::map<char*,int,ltstr> *revMap){
 	f->depth[i] = fp->depth[posi];
       posi++;
     }
-    void waiter();
-    waiter();
+    void waiter(int);
+    waiter(f->refId);
     selector(f);
   }
   delete fp;
@@ -366,10 +371,12 @@ void sendToSelector(mr::funkyPars *mfp,std::map<char *,int,ltstr> *revMap,int in
 
    argStruct *arguments = NULL;
    arguments = setArgStruct(argc,argv);
+   //   fprintf(stderr,"here: %d\n",arguments->inputtype);
    arguments->argumentFile=stderr;
    //catch the informative case where we want to view options associated with a command
    if(argc==2){
      //if we dont use bamfiles
+     //fprintf(stderr,"here: %d\n",arguments->inputtype);
      multiReader mr(arguments->inputtype,arguments);
      FILE *tempFile;
      fprintf(stderr,"\t-> Analysis helpbox/synopsis information:\n");

@@ -115,22 +115,6 @@ void multiReader::getOptions(argStruct *arguments){
   chunkSize=angsd::getArg("-chunkSize",chunkSize,arguments);
   fainame = angsd::getArg("-fai",fainame,arguments);
 
-  if(arguments->inputtype==4||arguments->inputtype==7){
-    if(fainame!=NULL){
-      fprintf(stderr,"Bams or simfiles does not require -fai argument\n");
-      exit(0);
-    }
-
-  }else{
-    if(fainame==NULL){
-      fprintf(stderr,"For non-bams or simfiles you should include -fai arguments\n");
-      exit(0);
-    }else{
-      arguments->hd=getHeadFromFai(fainame);
-      arguments->revMap = buildRevTable(arguments->hd);
-    }
-  }
-
   printArg(arguments->argumentFile);
 }
 
@@ -142,8 +126,8 @@ multiReader::multiReader(int type_a,argStruct *arguments) {
   fainame=NULL;
   nLines=1000;
   chunkSize = 10000;
-
-  getOptions(arguments);
+  if(arguments->argc!=2)
+    getOptions(arguments);
   
   sm=NULL;
   pl=NULL;
@@ -182,9 +166,9 @@ multiReader::multiReader(int type_a,argStruct *arguments) {
     break;
   }
   case 5:{
-    //fprintf(stderr,"\t[%s] assuming beagle gprobs input \n",__FUNCTION__);
-    bglObj = new beagle_reader;
-    bglObj->init(arguments);
+    //    fprintf(stderr,"\t[%s] assuming beagle gprobs input \n",__FUNCTION__);
+    bglObj = new beagle_reader(arguments);
+    //    bglObj->init(arguments);
     break;
   }
     
@@ -193,6 +177,21 @@ multiReader::multiReader(int type_a,argStruct *arguments) {
     //pl = new pileups (faifile,lStart,lStop,filenames,type);
     break;
   }
+  }
+  if(arguments->inputtype==4||arguments->inputtype==7){
+    if(fainame!=NULL){
+      fprintf(stderr,"Bams or simfiles does not require -fai argument\n");
+      exit(0);
+    }
+
+  }else{
+    if(fainame==NULL){
+      fprintf(stderr,"For non-bams or simfiles you should include -fai arguments\n");
+      exit(0);
+    }else{
+      arguments->hd=getHeadFromFai(fainame);
+      arguments->revMap = buildRevTable(arguments->hd);
+    }
   }
   
 }
@@ -243,7 +242,7 @@ mr::funkyPars *multiReader::fetch(){
     break;
   }
   case 5:{
-    fp = bglObj->fetch(nLines,chunkSize); 
+    fp = bglObj->fetch(chunkSize); 
     break;
   }
   default:{

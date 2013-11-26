@@ -152,7 +152,7 @@ void countCls::getOptions(argStruct *arguments){
 //constructor
 countCls::countCls(const char *outfiles,argStruct *arguments,int inputtype){
   nInd=arguments->nInd;
-  minInd =-1;
+  minInd = 0;
   minDepth =-1;
   trim =0;
   dumpCounts =0;
@@ -391,7 +391,7 @@ void countCls::run(funkyPars *pars){
   pars->counts = countNucs(pars->chk,minQ,trim,pars->keepSites);
   // fprintf(stderr,"%d\n",pars->keepSites[0]);
   //modify keepsites;
-  if(minInd!=-1) {
+  if(minInd!=0) {
     for(int i=0;i<pars->numSites;i++){
       if(pars->keepSites[i]==0)
 	continue;

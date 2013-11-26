@@ -120,7 +120,7 @@ void likeClass::printArg(FILE *argFile){
   fprintf(argFile,"\t-trim\t\t%d\t\t(zero means no trimming)\n",trim);
   fprintf(argFile,"\t-tmpdir\t\t%s/\t(used by SOAPsnp)\n",angsd_tmpdir);
   fprintf(argFile,"\t-errors\t\t%s\t\t(used by SYK)\n",errorFname);
-  fprintf(argFile,"\t-minInd\t\t%d\t\t(-1 indicates no filtering)\n",minInd);
+  fprintf(argFile,"\t-minInd\t\t%d\t\t(0 indicates no filtering)\n",minInd);
   fprintf(argFile,"\n");
   fprintf(argFile,"Filedumping:\n");
   fprintf(argFile,"\t-doGlf\t%d\n",doGlf);
@@ -200,7 +200,7 @@ likeClass::likeClass(const char *outfiles,argStruct *arguments,int inputtype){
   errorProbs = NULL;
   GL=0;
   minQ = 13;
-  minInd=-1;
+  minInd=0;
   angsd_tmpdir = strdup("angsd_tmpdir");
   
   if(arguments->argc==2){
@@ -276,9 +276,10 @@ likeClass::likeClass(const char *outfiles,argStruct *arguments,int inputtype){
 
 
 likeClass::~likeClass(){
+  fflush(stderr);
   free(angsd_tmpdir);
   
-  if(GL==0)
+  if(GL==0&&doGlf==0)
     return;
   else if(GL==1)
     bam_likes_destroy();
@@ -286,13 +287,14 @@ likeClass::~likeClass(){
     gatk_destroy();
   else if(GL==4)
     error::killGlobalErrorProbs(errorProbs);
-
   if(doGlf)//filehandle is only open if we want to print GL
+    //  fprintf(stderr,"outfile=%p\n",outfile);
     if(outfile!=NULL)
       fclose(outfile);
-    else
+    else{
+      //fprintf(stderr,"calling gzclose\n");
       gzclose(gzoutfile);
-  
+    }
 
   if(bufstr.s!=NULL)
     free(bufstr.s);
@@ -369,7 +371,7 @@ void likeClass::run(funkyPars *pars){
       }
       pars->keepSites[s] = efSize;
  
-      if(minInd!=-1&&minInd>efSize)
+      if(minInd!=0&&minInd>efSize)
 	pars->keepSites[s] = 0;
     }
   }

@@ -19,63 +19,228 @@
 #include "analysisFunction.h"
 #include "analysisKeepList.h"
 
+#define BIN ".bin"
+#define IDX ".idx"
 
-//this function is much to slow on a genome scale should be improved
-fMap getMap(char *fname,std::map<char*,int,ltstr> *revMap){
-  const char *delims = "\t\n ";
-  FILE *fp=getFILE(fname,"r");
-  
-  char buf[LENS];
-  int nsites=0;
-  fMap ret;
-  std::map<char *,int>::iterator rit;
-  while(fgets(buf,LENS,fp)){
-    char *chr = strtok(buf,delims);
-    strtok(NULL,delims);//rsnumber
-    strtok(NULL,delims);//centimorgan
-    char *tok = strtok(NULL,delims);
-    if(tok==NULL){
-      fprintf(stderr,"Problem with fileformat in .bim file\n");
-      exit(0);
-    }
-    int pos = atoi(tok)-1;//genomic position in bp
-    mm value;
-    value.major = refToInt[strtok(NULL,delims)[0]];
-    value.minor = refToInt[strtok(NULL,delims)[0]];
 
-    //check for N if this exists;
-    if(value.major==4||value.minor==4){
-      fprintf(stderr,"N extists in major minor defintion\n");
-      break;
-    }
-    //    fprintf(stderr,"chr=%s pos=%d major=%d minor=%d\n",chr,pos,mymm.major,mymm.minor);
-    rit=revMap->find(chr);
-    if(rit==revMap->end()){
-      fprintf(stderr,"Problem finding chromosome: %s in lookuptable\n",chr);
-      exit(0);
-    }
-
-    mm key;
-    key.major = rit->second;
-    key.minor = pos;
-    fMap::iterator it = ret.find(key);
-    if(it!=ret.end()){
-      fprintf(stderr,"duplicate entry in filterlist:%s : will exit offending position below\n",fname);
-      fprintf(stderr,"chr=%s pos=%d major=%d minor=%d\n",chr,pos,value.major,value.minor);
-      exit(0);
-    }else
-      ret.insert(fMap::value_type(key, value));
-  }
-  fclose(fp);
+//return one+two
+char *append(const char *one,const char*two){
+  char *ret = new char[strlen(one)+strlen(two)+1];
+  strcpy(ret,one);
+  strcpy(ret+strlen(ret),two);
   return ret;
 }
 
 
-filter::~filter(){
-  if(doFilter==0)
-    return;
-  //delete [] keepsChr;
+filt *filt_read(const char *fname){
+  fprintf(stderr,"Reading binary representation:%s\n",fname);
+  filt *ret = new filt;
+  ret->bg =NULL;
+  ret->fp =NULL;
+  ret->keeps = ret->major = ret->minor=NULL;
+  ret->nCols =0;
+  ret->curLen =0;
+  char *bin_name=append(fname,BIN);
+  char *idx_name=append(fname,IDX);
 
+  ret->fp= fopen(idx_name,"r");
+  ret->bg=bgzf_open(bin_name,"r");
+
+
+  while(1){
+    int chrId;
+    if(0==fread(&chrId,sizeof(int),1,ret->fp))
+      break;
+    asdf_dats tmp;
+    if(1!=fread(&tmp.offs,sizeof(int64_t),1,ret->fp)){
+      fprintf(stderr,"Problem reading chunk from binary file:\n");
+      exit(0);
+    }
+    if(1!=fread(&tmp.len,sizeof(int),1,ret->fp)){
+      fprintf(stderr,"Problem reading chunk from binary file:\n");
+      exit(0);
+    }
+    if(1!=fread(&ret->nCols,sizeof(int),1,ret->fp)){
+      fprintf(stderr,"Problem reading chunk from binary file:\n");
+      exit(0);
+    }
+    ret->offs[chrId]=tmp;
+  }
+  
+  std::map<int,asdf_dats>::const_iterator it;
+  //  fprintf(stderr,"nCols: %d\n",ret->nCols);
+  for(it=ret->offs.begin();0&&it!=ret->offs.end();++it)
+    fprintf(stderr,"id:%d offs:%zu len:%d\n",it->first,it->second.offs,it->second.len);
+  fprintf(stderr,"nChr: %zu loaded from binary filter file\n",ret->offs.size());
+  if(ret->nCols==4)
+    fprintf(stderr,"Filterfile contains major/minor information\n");
+
+  return ret;
+}
+
+
+
+
+
+void filt_gen(const char *fname,std::map<char*,int,ltstr>* revMap,aHead *hd){
+  fprintf(stderr,"Filterfile: %s supplied will generate binary representations...\n",fname);
+  std::map<char*,int,ltstr>::const_iterator it;
+  for(it= revMap->begin();0&&it!=revMap->end();++it)
+    fprintf(stderr,"%s->%d->%d\n",it->first,it->second,hd->l_ref[it->second]);
+  
+  gzFile gz = Z_NULL;
+  gz = gzopen(fname,"r");
+  assert(gz!=Z_NULL);
+
+
+
+  char* outnames_bin = append(fname,BIN);
+  char* outnames_idx = append(fname,IDX);
+    
+  const char *delims = "\t \n";
+  BGZF *cfpD = bgzf_open(outnames_bin,"w9");
+  FILE *fp =fopen(outnames_idx,"w");
+  
+  
+
+
+
+
+
+  std::map <int,char> mm;//simple structure to check that input has been sorted by chr/contig
+  char *ary = NULL;
+  char *major = NULL;
+  char *minor = NULL;
+  int last=-1;
+  int nCols = -1;
+  char buf[LENS];
+  //  gzread(gz,buf,LENS);
+
+  ////  char *rd=gzgets(gz,buf,LENS);
+  //fprintf(stderr,"rd=%s LENS=%d\n",buf,LENS);
+  while(gzgets(gz,buf,LENS)){
+    char chr[LENS] ;int id=-1;
+    int posi=-1;
+    char maj='N';
+    char min='N';
+    
+    int nRead=sscanf(buf,"%s\t%d\t%c\t%c\n",chr,&posi,&maj,&min);
+    
+    posi--;
+    assert(nRead!=0);
+    if(nCols==-1)
+      nCols=nRead;
+#if 0
+    fprintf(stderr,"nRead=%d: %s %d %c %c\n",nRead,chr,posi,maj,min);
+    exit(0);
+#endif    
+    assert(nRead==nRead);
+    it = revMap->find(chr);
+    if(it==revMap->end()){
+      fprintf(stderr,"chr: %s from filterfile: %s doesn't exist in index, will exit()\n",chr,fname);
+      exit(0);
+    }else
+      id=it->second;
+    
+    /*
+      1. if we have observed a chromo change then dump data
+      2. realloc
+      3. plug in values
+      (need to check that we have alloced a data <=> last!=-1)
+     */
+    if(last!=-1 &&last!=id){
+      //      fprintf(stderr,"writing index: last=%d id=%d\n",last,id);
+      assert(ary!=NULL);
+      //write data and index stuff
+      int64_t retVal =bgzf_tell(cfpD);
+      fwrite(&last,1,sizeof(int),fp);
+      fwrite(&retVal,1,sizeof(int64_t),fp);
+      fwrite(&hd->l_ref[last],1,sizeof(int),fp);
+      fwrite(&nCols,1,sizeof(int),fp);
+      bgzf_write(cfpD,ary,hd->l_ref[last]);//write len of chr
+      if(nCols==4){
+	bgzf_write(cfpD,major,hd->l_ref[last]);//write len of chr
+	bgzf_write(cfpD,minor,hd->l_ref[last]);//write len of chr
+      }
+    }
+    if(last!=id){
+      fprintf(stderr,"Allocing chr:%s\n",chr);
+      std::map<int,char>::iterator it=mm.find(id);
+      if(it!=mm.end()){
+	fprintf(stderr,"filter file, doesn't look sorted by chr, will exit()");
+	exit(0);
+      }else
+	mm[id]=1;
+      last=id;
+      ary=new char[hd->l_ref[last]];
+      memset(ary,0,hd->l_ref[last]);
+      //      fprintf(stderr,"chr: %s id=%d len=%d\n",chr,last,hd->l_ref[last]);
+      if(nCols==4){
+	major=new char[hd->l_ref[last]];
+	memset(major,0,hd->l_ref[last]);
+	minor=new char[hd->l_ref[last]];
+	memset(minor,0,hd->l_ref[last]);
+      }
+      
+    }else
+      if(posi > hd->l_ref[id]){
+	fprintf(stderr,"Position in filter file:%s is after end of chromosome? Will exit\n",fname);
+	exit(0);
+      }
+      ary[posi] = 1;
+      if(nCols==4){
+	major[posi] = refToInt[maj];
+	minor[posi] = refToInt[min];
+      }
+  }
+  if(last!=-1){
+    //fprintf(stderr,"writing index\n");
+    assert(ary!=NULL);
+    //write data and index stuff
+    int64_t retVal =bgzf_tell(cfpD);
+    fwrite(&last,1,sizeof(int),fp);
+    fwrite(&retVal,1,sizeof(int64_t),fp);
+    fwrite(&hd->l_ref[last],1,sizeof(int),fp);
+    fwrite(&nCols,1,sizeof(int),fp);
+    bgzf_write(cfpD,ary,hd->l_ref[last]);//write len of chr
+    if(nCols==4){
+      bgzf_write(cfpD,major,hd->l_ref[last]);//write len of chr
+      bgzf_write(cfpD,minor,hd->l_ref[last]);//write len of chr
+    }
+  }
+
+  fprintf(stderr,"Filtering complete: Observed: %zu different chromosomes from file:%s\n",mm.size(),fname);
+
+  mm.clear();
+  gzclose(gz);fclose(fp);bgzf_close(cfpD);
+
+}
+
+
+
+
+filt *filt_init(const char *fname,std::map<char*,int,ltstr>* revMap,aHead *hd){
+  char *bin_name=append(fname,BIN);
+  char *idx_name=append(fname,IDX);
+  if(!fexists(bin_name)||!fexists(idx_name))
+    filt_gen(fname,revMap,hd);
+  return  filt_read(fname);
+}
+
+
+
+filter::~filter(){
+  if(fl!=NULL){
+    if(fl->keeps)
+      free(fl->keeps);
+    if(fl->major)
+      free(fl->major);
+    if(fl->minor)
+      free(fl->minor);
+    fclose(fl->fp);
+    bgzf_close(fl->bg);
+    delete fl;
+  }
 }
 
 
@@ -83,16 +248,15 @@ filter::filter(argStruct *arguments){
   //below if shared for all analysis classes
   header = arguments->hd;
   revMap = arguments->revMap;
-
+  fl = NULL;
   //his is used by this class
   keepsChr = NULL;
   curChr = -1;
   fp = NULL;
-  minInd = -1;
+  minInd = 0;
   fname = NULL;
   doMajorMinor =0;
-  doFilter =0;
-
+  
   if(arguments->argc==2){
     if(!strcmp(arguments->argv[1],"-filter")){
       printArg(stdout);
@@ -110,7 +274,7 @@ filter::filter(argStruct *arguments){
 
 void filter::printArg(FILE *argFile){
   fprintf(argFile,"--------------\n%s:\n",__FILE__);
-  fprintf(argFile,"\t-filter\t\t%s dofilter=%d\n",fname,doFilter);
+  fprintf(argFile,"\t-filter\t\t%s \n",fname);
   fprintf(argFile,"\t-doMajorMinor\t%d\t\n",doMajorMinor);
   fprintf(argFile,"\t1: Infer major and minor from GL\n");
   fprintf(argFile,"\t2: Infer major and minor from allele counts\n");
@@ -120,41 +284,24 @@ void filter::printArg(FILE *argFile){
   fprintf(argFile,"\t-minInd\t\t%d\tOnly use site if atleast minInd of samples has data\n",minInd);  fprintf(argFile,"\n");
 }
 
-//1=bim file 2=keep file
-int findType( char *fname){
-  char *dotStart = strrchr(fname,'.');
-  //  fprintf(stderr,"%s",dotStart);
-  if(0==strcmp(dotStart,".bim"))
-    return 1;
-  if(0==strcmp(dotStart,".keep"))
-    return 2;
-  fprintf(stderr,"Unknown filterfile, should be either .bim or .keep\n");
-  exit(0);
-}
-
-
 void filter::getOptions(argStruct *arguments){
   fname=angsd::getArg("-filter",fname,arguments);
-  
-  if(fname!=NULL)
-    doFilter = findType(fname);
+
+  if(fname!=NULL)  
+    fl = filt_init(fname,revMap,header);
+  if(fl!=NULL)
+    fprintf(stderr,"-filter is still beta, use at own risk...\n");
+
+
   //1=bim 2=keep
-
   doMajorMinor = angsd::getArg("-doMajorMinor",doMajorMinor,arguments);
-  if(doMajorMinor==3 && doFilter!=1){
-    fprintf(stderr,"Must supply -filter with .bim file if -doMajorMinor 3\n");
-    exit(0);
+  if(doMajorMinor==3 && fl!=NULL&& fl->nCols!=4){
+    fprintf(stderr,"Must supply -filter with a file containing major and minor if -doMajorMinor 3\n");
+  }
+  if(doMajorMinor!=3 && fl!=NULL&& fl->nCols==4){
+    fprintf(stderr,"Filter file contains major/minor information to use these in analysis supper \'-doMajorMinor 3\'\n");
   }
   
-
-  if(doFilter==1){
-    fm = getMap(fname,revMap);
-    fprintf(stderr,"\t-> number of sites in filter: %lu\n",fm.size());
-  }else if(doFilter==2){
-    fp = getFILE(fname,"r");
-    //  readSites();
-    fprintf(stderr,"Filtering with .keep is still beta\n");
-  }
   minInd = angsd::getArg("-minInd",minInd,arguments);
 }
 
@@ -162,60 +309,39 @@ void filter::getOptions(argStruct *arguments){
 void filter::run(funkyPars *p){
   //  fprintf(stderr,"nsites=%d\n",p->numSites);
   p->keepSites=new int[p->numSites];
-  //  p->results->freq->keepInd = new int[p->numSites];
-
+  
   for(int s=0;s<p->numSites;s++){
     p->keepSites[s]=p->nInd;
     //    p->results->freq->keepInd[s]=nInd;  
   }
-  if(doFilter==1 && doMajorMinor==3){
-    p->major= new char [p->numSites];
-    p->minor= new char [p->numSites];
+
+
+  if(fl!=NULL && fl->nCols==4){
+    //    fprintf(stderr,"aloocating for major and minor\n");
+    p->major = new char [p->numSites];
+    p->minor = new char [p->numSites];
     for(int i=0;i<p->numSites;i++){
       p->major[i] = 4;
       p->minor[i] = 4;
     }
   }
 
-  if(doFilter==1) {
+  if(fl!=NULL) {
     for(int s=0;s<p->numSites;s++){
-      mm key;
-      key.major=p->refId;key.minor = p->posi[s];
 
-      fMap::iterator it = fm.find(key);
-      if(it==fm.end()){
-	//fprintf(stderr,"not here\n");
+      if(fl->keeps[p->posi[s]]==0){
+	//	fprintf(stderr,"Plugging inf vals std\n");
 	p->keepSites[s] =0;
-	continue;
       }
-      else if(doMajorMinor==3) {
-	p->major[s] = it->second.major;
-	p->minor[s] = it->second.minor;
-	if(p->major[s]<0||p->major[s]>3)
-	  p->keepSites[s] =0;
-	if(p->minor[s]<0||p->minor[s]>3||p->minor==p->major)
-	  p->keepSites[s] =0;
-	
-
+      if(p->keepSites[s] && fl->nCols==4){
+	//fprintf(stderr,"Plugging inf vals std majorminor\n");
+	p->major[s] = fl->major[p->posi[s]];
+	p->minor[s] = fl->minor[p->posi[s]];
       }
-    }
-  }else if(doFilter==2){
-    if(p->refId!=curChr){
-      fprintf(stderr,"Problem with mismatch of filtering dataChr=%d filterChr=%d check ordering of chrs in filter file\n",p->refId,curChr);
-      fflush(stderr);
-      exit(0);
-    }
-
-    for(int s=0;s<p->numSites;s++){
-      //      fprintf(stderr,"posi=%d reflength=%d\n",p->posi[s],header->l_ref[p->refId]);
-      if(keepsChr==NULL||keepsChr[p->posi[s]]==0)
-	p->keepSites[s] = 0;
-      
     }
   }
-
   //how set the keepsites according the effective sample size persite
-  if(-1!=minInd){
+  if(0!=minInd){
     if(p->chk!=NULL){
       //loop over sites;
       for(int s=0;s<p->numSites;s++){
@@ -245,86 +371,27 @@ void filter::clean(funkyPars *p){
 }
 
 
-void filter::readSites() {
-  if(doFilter!=2)
+void filter::readSites(int refId) {
+  //  fprintf(stderr,"[%s].%s():%d -> refId:%d\n",__FILE__,__FUNCTION__,__LINE__,refId);
+  if(fl==NULL)
     return;
-  fprintf(stderr,"[%s]\n",__FUNCTION__);
-  assert(doFilter==2&&fp!=NULL);
-  static int bufPos = -1;//position
-  static int bufChr = -1;//chromosome id refID
-  static char *chrName = NULL;//chromosome name
-  delete [] keepsChr;   keepsChr = NULL;
-  
-  char buf[1024];
-  std::map<char *,int,ltstr>::iterator it;
-
-  //this conditional only happens at beginning of file.
-  if(bufPos==-1&&bufChr==-1){
-    fgets(buf,1024,fp);
-    char *tok = strtok(buf,"\n \t");//chrname
-    it = revMap->find(tok);
-    int posi = atoi(strtok(NULL,"\n \t")) -1; //offset by one
-    if(it==revMap->end()){
-      fprintf(stderr,"Problem finding chr=%s\n",tok);
-      exit(0);
-    }
-    if(posi>header->l_ref[it->second]){
-      fprintf(stderr,"Position in keep list exeeds reference\n");
-      exit(0);
-    }
-    bufPos =posi;
-    bufChr = it->second;
+  std::map<int,asdf_dats> ::iterator it = fl->offs.find(refId);
+  if(it==fl->offs.end()){
+    fprintf(stderr,"Problem finding chrId: %d in index\n",refId);
+    exit(0);
   }
-  
-  if(curChr==bufChr){
-    fprintf(stderr,"Couldn't read more positions for filtering, won't use more sites for analysis\n");
-    extern int SIG_COND;
-    SIG_COND=0;
-    return;
+  bgzf_seek(fl->bg,it->second.offs,SEEK_SET);
+  if(it->second.len>fl->curLen) 
+    fl->keeps=(char*) realloc(fl->keeps,it->second.len);
+  bgzf_read(fl->bg,fl->keeps,it->second.len);
+
+  if(fl->nCols==4){
+    if(it->second.len>fl->curLen) {
+      fl->major = (char*) realloc(fl->major,it->second.len);
+      fl->minor = (char*) realloc(fl->minor,it->second.len);
+    }
+    bgzf_read(fl->bg,fl->major,it->second.len);
+    bgzf_read(fl->bg,fl->minor,it->second.len);
   }
-  
-  fprintf(stderr,"reading a chr from posi file bufPos=%d bufCHr=%d revmapSize=%lu chrName=%s\n",bufPos,bufChr,revMap->size(),bufChr!=-1?header->name[bufChr]:NULL);
-  fflush(stderr);
-
-  keepsChr = new char[header->l_ref[bufChr]];
-  memset(keepsChr,0,header->l_ref[bufChr]);
-  keepsChr[bufPos] = 1;
-  curChr = bufChr;
-  chrName=header->name[bufChr];
-  
-  while(fgets(buf,1024,fp)) {
-    char *tok = strtok(buf,"\n \t");
-    int posi = atoi(strtok(NULL,"\n \t")) -1; //offset by one
-
-    //most general case, the next position is on same chromosome as the last line.
-    if(0==strcmp(chrName,tok)){
-      if(posi>header->l_ref[bufChr]){
-	fprintf(stderr,"Position in keep list exeeds reference\n");
-	exit(0);
-      }
-      keepsChr[posi] = 1;
-      continue;
-    }
-
-    //check if the chromosomeID matches the header of our data
-    it = revMap->find(tok);
-    if(it==revMap->end()){
-      fprintf(stderr,"Problem finding chr=%s\n",tok);
-      exit(0);
-    }
-    //check if length does no exceed reflength
-    if(posi>header->l_ref[it->second]){
-      fprintf(stderr,"Position in keep list exeeds reference\n");
-      exit(0);
-    }
-    //if we are here then we should buffer whatthe site and break;
-    bufChr=it->second;
-    bufPos=posi;
-    break;
-  }
-  int tsum= 0;
-  for(int i =0;i<header->l_ref[bufChr];i++)
-    if(keepsChr[i])tsum++;
-  fprintf(stderr,"Done reading a chrID=%d with name=%s nSites=%d\n",curChr,chrName,tsum);
-
+ 
 }

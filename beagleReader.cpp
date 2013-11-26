@@ -1,13 +1,14 @@
 #include <sys/stat.h>
 #include <zlib.h>
-
+#include <cassert>
 #include "argStruct.h"
 #include "beagleReader.h"
 #include "analysisFunction.h"
 
 void beagle_reader::printArg(FILE *argFile){
-  fprintf(argFile,"%s:\n\n",__FILE__);
-  fprintf(argFile,"-beagle=%s \n",fname);
+  fprintf(argFile,"-------------\n%s:\n",__FILE__); 
+  fprintf(argFile,"\t-beagle=%s\t(Beagle Filename (can be .gz))\n",fname);
+  fprintf(argFile,"\t-intName=%d\t(Assume First column is chr_position)\n",intName);
   fprintf(argFile,"\n");
 }
 void beagle_reader::getOptions(argStruct *arguments){
@@ -19,14 +20,27 @@ void beagle_reader::getOptions(argStruct *arguments){
     printArg(stderr);
     exit(0);
   }
-  //  printArg(arguments->argFile);
+  printArg(arguments->argumentFile);
 }
 
 
 
 
 
-void beagle_reader::init(argStruct *arguments){
+beagle_reader::beagle_reader(argStruct *arguments){
+  //  fprintf(stderr,"[%s]\n",__FUNCTION__);
+  fflush(stderr);
+  if(arguments->argc==2){
+    if(!strcmp(arguments->argv[1],"-beagle")){
+      printArg(stdout);
+      exit(0);
+    }else if(!strcmp(arguments->argv[1],"-intName")){
+      printArg(stdout);
+      exit(0);
+    }else
+      return;
+  }
+
   getOptions(arguments);
 
 
@@ -58,9 +72,9 @@ void beagle_reader::init(argStruct *arguments){
 
 }
 
-mr::funkyPars *beagle_reader::fetch(int nIndOther,int chunksize){
+mr::funkyPars *beagle_reader::fetch(int chunksize){
 
-  // fprintf(stdout,"nInd %d\tnIndOther %d\tchunksize %d\n",nInd,nIndOther,chunksize);
+  //  fprintf(stdout,"nInd %d\tchunksize %d\n",nInd,chunksize);
   char refToChar[256] = {
     0,1,2,3,4,4,4,4,4,4,4,4,4,4,4,4,//15
     4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,//31
@@ -97,10 +111,14 @@ mr::funkyPars *beagle_reader::fetch(int nIndOther,int chunksize){
   
   int nSites=0;
   static int positions =0;//every site is a new position across different chunks
+  
   while(gzgets(openBeagleFile,buffer,lens)){
+    
+    assert(buffer!=NULL);
     if(intName){
       myfunky->sites[nSites].chromo = strdup(strtok(buffer,delims2));
       myfunky->sites[nSites].position = atoi(strtok(NULL,delims2))-1;
+      //  fprintf(stderr,"poisi=%d\n",myfunky->sites[nSites].position);
     }
     else{
       myfunky->sites[nSites].chromo = strdup(strtok(buffer,delims));
@@ -114,14 +132,17 @@ mr::funkyPars *beagle_reader::fetch(int nIndOther,int chunksize){
     myfunky->minor[nSites] = refToChar[strtok(NULL,delims)[0]];
     
     //fprintf(stdout,"chr %s\t pos %d\t major %d\tminor %d\n",myfunky->sites[nSites].chromo,myfunky->sites[nSites].position,myfunky->major[nSites],myfunky->minor[nSites]);
-    for(int i=0;i<nInd*3;i++)
-      post[nSites][i] = atof(strtok(NULL,delims));
+    for(int i=0;i<nInd*3;i++){
+      char *tsk = strtok(NULL,delims);
+      assert(tsk!=NULL);
+      post[nSites][i] = atof(tsk);
     
+    }
     
-   nSites++;
-   if(nSites>=chunksize)
-     break;
- }
+    nSites++;
+    if(nSites>=chunksize)
+      break;
+  }
 
   if(nSites<chunksize){
     for(int s=nSites;s<chunksize;s++)

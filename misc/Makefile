@@ -10,8 +10,8 @@ all: optimSFS supersim sfstools emOptim calcStat bgid
 bfgs.o: bfgs.c bfgs.h
 	$(CC) $(FLAGS) -c bfgs.c
 
-optimSFS: testfolded17.c bfgs.o
-	$(CC) $(FLAGS) testfolded17.c -std=c99 bfgs.o -o optimSFS -lm -lpthread
+optimSFS: testfolded18.c bfgs.o
+	$(CC) $(FLAGS) testfolded18.c -std=c99 bfgs.o -o optimSFS -lm -lpthread
 
 simnextgen: simnextgen10.c
 	$(CC) $(FLAGS) simnextgen10.c -o simnextgen -lm -lz

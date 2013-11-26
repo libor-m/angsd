@@ -8,7 +8,7 @@
 #include "kstring.h"
 #include "indexer.h"
 #include "mUpPile.h"
-#include "threadpool3.cpp"
+//#include "threadpool3.cpp"
 #include "getFasta.h"
 
 extern int SIG_COND;
@@ -1426,6 +1426,11 @@ void *setIterator1(void *args){
   //  getOffsets(strdup(rd->regions[rd->itrPos]),rd->fname,rd->hd,rd->it);//leak
 }
 
+typedef struct{
+  bufReader *rds;
+  int index;
+}it_struct;
+
 
 void setIterators(bufReader *rd,regs regions,int nFiles,int nThreads){
   for(int i=0;1&&i<nFiles;i++){
@@ -1434,10 +1439,30 @@ void setIterators(bufReader *rd,regs regions,int nFiles,int nThreads){
       setIterator1(&rd[i]);
   }
   if(nThreads>1){
+    pthread_t myT[nThreads];
+    int cnt=0;
+    while(cnt<nFiles){
+      int nTimes;
+      if(nFiles-cnt-nThreads>=0)
+	nTimes = nThreads;
+      else
+	nTimes = nFiles-cnt;
+      for(int i=0;0&&i<nTimes;i++)
+	fprintf(stderr,"cnt:%d i:%d\n",cnt+i,i);
+      for(int i=0;i<nTimes;i++)
+	pthread_create(&myT[i],NULL,setIterator1,&rd[cnt+i]);
+      for(int i=0;i<nTimes;i++)
+	pthread_join(myT[i], NULL);
+
+      cnt+=nTimes;
+    }
+    
+#if 0
     threadpool *tp = init_threadpool(nThreads,setIterator1_thread,nFiles,1);
     threadpool_iter(tp,rd,nFiles);
     wait_kill(tp);
     tp = NULL;
+#endif
   }
 }
 
@@ -1499,7 +1524,11 @@ int uppile(int show,int nThreads,bufReader *rd,int NLINES,int nFiles,std::vector
       }else {
 	itrPos++;
 	fprintf(stderr,"region lookup %d/%lu\n",itrPos+1,regions.size());
+	fflush(stderr);
 	setIterators(rd,regions[itrPos],nFiles,nThreads);
+	fprintf(stderr,"done region lookup %d/%lu\n",itrPos+1,regions.size());
+	fflush(stderr);
+
 	theRef = rd[0].it.tid;
 	
 	//validate we have offsets;
@@ -1544,8 +1573,8 @@ int uppile(int show,int nThreads,bufReader *rd,int NLINES,int nFiles,std::vector
     assert(theRef>=0 && theRef<rd[0].hd->n_ref);//ref should be inrange [0,#nref in header]
 
     //load fasta for this ref if needed
-    void waiter();
-    waiter();
+    void waiter(int);
+    waiter(theRef);//will wait for exisiting threads and then load stuff relating to the chromosome=theRef;
     if(gf->ref!=NULL && theRef!=gf->ref->curChr)
       gf->loadChr(gf->ref,rd[0].hd->name[theRef],theRef);
     

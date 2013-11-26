@@ -112,7 +112,7 @@ void *threadfunc_spin(void *parm) {
 void *threadfunc_seq(void *parm) {
   inner *args = (inner *) parm;
   int threadindex = args->threadNum;
-  //fprintf(stderr,"[%s] i=%d is init\n",__FUNCTION__,threadindex);
+  fprintf(stderr,"[%s] i=%d is init\n",__FUNCTION__,threadindex);
   threadpool *tp = args->tp;
   int  rc;
   
@@ -199,11 +199,11 @@ threadpool *init_threadpool(int nthread,void (*callback)(void*,int),int nprobs,i
     for(int i=1;i<nthread;i++)
       ret->splitpoints[i] = ret->splitpoints[i-1] + nprobs/nthread;
     ret->splitpoints[nthread]=nprobs;
-    if(0){
+#if 0
       for(int i=0;i<nthread+1;i++)
 	fprintf(stderr,"i=%d\t",ret->splitpoints[i]);
       fprintf(stderr,"\n");
-    }
+#endif
   }
   
 
@@ -271,13 +271,19 @@ void wait_kill(threadpool *tp){
   
   if((rc=pthread_mutex_lock(tp->mutex_done)))
     __printErr(tp->fp);
+  fprintf(stderr,"waitkill prewhile: tp->nDone:%d\n\n",tp->nDone);
+  fflush(stderr);
+ 
   while(tp->nDone<tp->nthread){
+    fprintf(stderr,"waitkill inwhile: tp->nDone:%d\n\n",tp->nDone);
+    fflush(stderr);
     if((rc=pthread_cond_wait(tp->cond_done,tp->mutex_done)))
       __printErr(tp->fp);
   }
   if((rc=pthread_mutex_unlock(tp->mutex_done)))
     __printErr(tp->fp);
-  //  fprintf(stderr,"done waiting will kill now\n");
+  fprintf(stderr,"done waiting will kill now\n");
+  fflush(stderr);
   tp->STOPTHREADS = 1;
   
   pthread_mutex_lock(tp->mutex_iter);

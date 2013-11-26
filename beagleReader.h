@@ -13,8 +13,8 @@ private:
   void getOptions(argStruct *arguments);
   void printArg(FILE *fp);
 public:
-  void init(argStruct *arguments);
+  beagle_reader(argStruct *arguments);
   int nInd;
-  mr::funkyPars *fetch(int nLines,int chunkSize);
+  mr::funkyPars *fetch(int chunkSize);
 };
 

@@ -98,7 +98,7 @@ double findmax_bfgs(int numpars, double *invec,const void*dats, double (*fun)(co
   m=MVAL;
   factr = FACTR;
   pgtol = PGTOL;
-  
+
   //important to zero initialize arrays below
   grad =(double *) calloc(numpars,sizeof(double));
   wa =(double *) calloc(((2*m+4)*numpars + 12*m*m + 12*m),sizeof(double));
@@ -113,7 +113,7 @@ double findmax_bfgs(int numpars, double *invec,const void*dats, double (*fun)(co
   while (1) {
     setulb_(&numpars, &m, invec, lowbound, upbound, nbd, &like,grad, &factr, &pgtol, wa, iwa, task, &noisy, csave, lsave,isave, dsave);
     if (task[0]=='F' && task[1]=='G') {
-      printf("\t");
+      //printf("\t");
       like = fun(invec,dats);
       if(dfun!=NULL)
 	dfun(invec, grad);

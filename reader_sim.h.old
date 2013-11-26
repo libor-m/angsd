@@ -7,9 +7,6 @@
 class reader_sim{
 private:
   int nInd;
-  int nInd2;//<-used when slicing out samples, totally addhoc, should be generealized
-  int from;
-  int to;
   gzFile gz;
   void getOptions(argStruct *arguments);
   char *fname;

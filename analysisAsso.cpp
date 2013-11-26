@@ -32,7 +32,6 @@ public:
   int minCount;
   int adjust;  //not for users
   int model;
-  float minMaf;
   void run(funkyPars  *pars);
   void print(funkyPars *pars);  
   void clean(funkyPars *pars);  
@@ -59,25 +58,29 @@ public:
 void asso::printArg(FILE *argFile){
   fprintf(argFile,"-------------\n%s:\n",__FILE__);
   fprintf(argFile,"\t-doAsso\t%d\n",doAsso);
-  fprintf(argFile,"\t1: frequency test (known major minor)\n");
-  fprintf(argFile,"\t2: score test\n");
-  fprintf(argFile,"\t3: frequency test (unknown major minor)\n");
-  fprintf(argFile,"\t-yBin\t\t%s\n",yfile);
-  fprintf(argFile,"\t-yQuant\t\t%s\n",yfile);
-  fprintf(argFile,"\t-minHigh\t%d\n",minHigh);
-  fprintf(argFile,"\t-minCount\t%d\n",minCount);
-  fprintf(argFile,"\t-minMaf\t\t%f\n",minMaf);
-  fprintf(argFile,"\t-cov\t\t%s\n",covfile);
-
-  fprintf(argFile,"\t-model (only for score)\t%d\n",model);
-  fprintf(argFile,"\t1: additive/log-additive (default)\n");
-  fprintf(argFile,"\t2: dominant\n");
-  fprintf(argFile,"\t3: recessive \n");
+  fprintf(argFile,"\t1: Frequency Test (Known Major and Minor)\n");
+  fprintf(argFile,"\t2: Score Test\n");
+  fprintf(argFile,"\t3: Frequency Test (Unknown Minor)\t\n");
+  fprintf(argFile,"  Frequency Test Options:\n");
+  fprintf(argFile,"\t-yBin\t\t%s\t(File containing disease status)\t\n\n",yfile);
+  fprintf(argFile,"  Score Test Options:\n");
+  fprintf(argFile,"\t-yBin\t\t%s\t(File containing disease status)\n",yfile);
+  fprintf(argFile,"\t-yQuant\t\t%s\t(File containing phenotypes)\n",yfile);
+  fprintf(argFile,"\t-minHigh\t%d\t(Require atleast minHigh number of high credible genotypes)\n",minHigh);
+  fprintf(argFile,"\t-minCount\t%d\t(Require this number of minor alleles, estimated from MAF)\n",minCount);
+  fprintf(argFile,"\t-cov\t\t%s\t(File containing additional covariates)\n",covfile);
+  fprintf(argFile,"\t-model\t%d\n",model);
+  fprintf(argFile,"\t1: Additive/Log-Additive (Default)\n");
+  fprintf(argFile,"\t2: Dominant\n");
+  fprintf(argFile,"\t3: Recessive\n\n");
+  fprintf(argFile,"Examples:\n\tPerform Frequency Test\n\t  \'./angsd -yBin pheno.ybin -doAsso 1 -GL 1 -out out -doMajorMinor 1 -minLRT 24 -doMaf 2 -doSNP 1 -bam bam.filelist'\n");
+  fprintf(argFile,"\tPerform Score Test\n\t  \'./angsd -yBin pheno.ybin -doAsso 2 -GL 1 -doPost 1 -out out -doMajorMinor 1 -minLRT 24 -doMaf 2 -doSNP 1 -bam bam.filelist'\n");
   fprintf(argFile,"\n");
 }
 
 
 void asso::getOptions(argStruct *arguments){
+
 
   doAsso=angsd::getArg("-doAsso",doAsso,arguments);
 
@@ -85,7 +88,6 @@ void asso::getOptions(argStruct *arguments){
 
   adjust=angsd::getArg("-adjust",adjust,arguments);
   model=angsd::getArg("-model",model,arguments);
-  minMaf=angsd::getArg("-minMaf",minMaf,arguments);
   minCov=angsd::getArg("-minCov",minCov,arguments);
   dynCov=angsd::getArg("-dynCov",dynCov,arguments);
   minHigh=angsd::getArg("-minHigh",minHigh,arguments);
@@ -143,7 +145,6 @@ asso::asso(const char *outfiles,argStruct *arguments,int inputtype){
   minHigh=10;
   minCount=10;
   dynCov=0;//not for users
-  minMaf=0;
   minCov=5;//not for users
   adjust=1;//not for users
   doMaf=0;
@@ -267,9 +268,9 @@ asso::asso(const char *outfiles,argStruct *arguments,int inputtype){
   //print header
   for(int yi=0;yi<ymat.y;yi++){
     if(doAsso==2)
-      fprintf(MultiOutfile[yi],"chr\tposition\tmajor\tminor\tfrequency\tNind\tLRT\thighHe\thighHo\n");
+      fprintf(MultiOutfile[yi],"Chromosome\tPosition\tMajor\tMinor\tFrequency\tN\tLRT\thighHe\thighHo\n");
     else
-      fprintf(MultiOutfile[yi],"chr\tposition\tmajor\tminor\tfrequency\tLRT\n");
+      fprintf(MultiOutfile[yi],"Chromosome\tPosition\tMajor\tMinor\tFrequency\tLRT\n");
   }
 }
 
@@ -492,12 +493,6 @@ void asso::scoreAsso(funkyPars  *pars){
     if(pars->keepSites[s]==0)
       continue;
     
-    if(pars->results->asso->freq[s] < minMaf){
-      for(int yi=0;yi<ymat.y;yi++) {
-	stat[yi][s]=-999;
-	keepInd[yi][s]=-999;
-      }
-    }
     
     int *keepListAll = new int[pars->nInd];
     for(int i=0 ; i<pars->nInd ;i++){
@@ -594,8 +589,8 @@ void asso::getFit(double *res,double *Y,double *covMatrix,int nInd,int nEnv){
 
 
 double asso::doAssociation(funkyPars *pars,double *postOrg,double *yOrg,int keepInd,int *keepList,double freq,int s){
-    if(doPrint)
-    fprintf(stderr,"staring [%s]\t[%s]\n",__FILE__,__FUNCTION__);
+  if(doPrint)
+    fprintf(stderr,"Staring [%s]\t[%s]\n",__FILE__,__FUNCTION__);
 
   double covMatrix[(covmat.y+1)*keepInd];
   double y[keepInd];
