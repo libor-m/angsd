@@ -69,7 +69,7 @@ void asso::printArg(FILE *argFile){
   fprintf(argFile,"\t-minMaf\t\t%f\n",minMaf);
   fprintf(argFile,"\t-cov\t\t%s\n",covfile);
 
-  fprintf(argFile,"\t-model (only for score)\t%d (does not work yet!)\n",model);
+  fprintf(argFile,"\t-model (only for score)\t%d\n",model);
   fprintf(argFile,"\t1: additive/log-additive (default)\n");
   fprintf(argFile,"\t2: dominant\n");
   fprintf(argFile,"\t3: recessive \n");
@@ -480,6 +480,7 @@ void asso::scoreAsso(funkyPars  *pars){
     exit(0);
   }
 
+
   int **keepInd  = new int*[ymat.y];
   double **stat = new double*[ymat.y];
   for(int yi=0;yi<ymat.y;yi++){
@@ -692,6 +693,19 @@ double asso::doAssociation(funkyPars *pars,double *postOrg,double *yOrg,int keep
   // exit(0);
 
 
+  if(model==2){
+    for(int i=0 ; i<keepInd ;i++) {
+      post[i*3+1]+=post[i*3+2];
+      post[i*3+2]=0;
+    }
+  }
+  if(model==3){
+    for(int i=0 ; i<keepInd ;i++) {
+      post[i*3+0]+=post[i*3+1];
+      post[i*3+1]=post[i*3+2];
+      post[i*3+2]=0;
+    }
+  }
 
 
   double stat;

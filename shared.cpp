@@ -26,6 +26,14 @@
 //class to keep track of chunk order when dumping results
 #include "printRes.h"
 
+
+//small hack
+
+pthread_attr_t attr;
+
+
+
+
 int andersSux =0;
 general **allMethods = NULL;
 
@@ -79,6 +87,10 @@ void init(argStruct *arguments){
   //  fprintf(stderr,"[%s] \n",__FILE__);
   fprintf(stderr,"\t->Starting analysis\n");
   header = arguments->hd;
+  pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+  
+
 }
 
 
@@ -226,7 +238,7 @@ void master2(funkyPars *p){
   //  fprintf(stderr,"[%s] Number of threads running=%d\n",__FUNCTION__,curRunning);
   pthread_mutex_lock( &counterMut );
   if(pthread_create( &thread1, NULL, slave2, (void*) p)){
-    fprintf(stderr,"Problem spawning thread\n%s\n",strerror(errno));
+    fprintf(stderr,"[%s] Problem spawning thread\n%s\n",__FUNCTION__,strerror(errno));
     exit(0);
   }
   pthread_detach(thread1);
@@ -245,11 +257,15 @@ void master(funkyPars *p){
     //fprintf(stderr,"Done waiting for finishing threads:%d\n",curRunning);
   }
   pthread_mutex_unlock( &counterMut );
-  if(pthread_create( &thread1, NULL, slave, (void*) p)){
-    fprintf(stderr,"Problem spawning thread\n%s\n",strerror(errno));
+  if(pthread_create( &thread1, &attr, slave, (void*) p)){
+    fprintf(stderr,"[%s] Problem spawning thread\n%s\n",__FUNCTION__,strerror(errno));
+    while(1){
+      fprintf(stderr,"[%s] Problem spawning thread\n%s\n",__FUNCTION__,strerror(errno));
+      
+    }
     exit(0);
   }
-  pthread_detach(thread1);
+  // pthread_detach(thread1);
 }
 
 void waiter(){
@@ -455,7 +471,8 @@ void printFunky(funkyPars *p){
       deallocFunkyPars(p);
     else{
       if(pthread_create( &cleanThread, NULL, cleanFunky, (void*) p)){
-	fprintf(stderr,"Problem spawning thread\n%s\n",strerror(errno));
+	fprintf(stderr,"[%s] Problem spawning thread\n%s\n",__FUNCTION__,strerror(errno));
+	//fprintf(stderr,"Problem spawning thread\n%s\n",strerror(errno));
 	exit(0);
       }
       // fprintf(stderr,"ret=%d\n",ret);

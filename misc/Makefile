@@ -29,7 +29,7 @@ emOptim: emOptim.cpp
 	$(CXX) $(FLAGS) emOptim.cpp -o emOptim -lz -lpthread
 
 bgid:	bgid5.cpp stats.cpp ../kstring.o ../bgzf.o
-	$(CXX) $(FLAGS) bgid5.cpp -I../  ../kstring.o ../bgzf.o ../knetfile.o -lz
+	$(CXX) $(FLAGS) bgid5.cpp -I../  ../kstring.o ../bgzf.o ../knetfile.o -lz -o bgid
 
 
 clean:
