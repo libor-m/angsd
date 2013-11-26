@@ -13,6 +13,8 @@
 #include "analysisAsso.cpp"
 #include "analysisHWE.h"
 #include "analysisAnsError.cpp"
+#include "analysisAbbababa.cpp"
+#include "analysisFasta.cpp"
 #include "analysisCallGenotypes.h"
 #include "getFasta.h"//for reading fasta; ancestral and refernce
 #include "analysisCount.cpp" //generate counts from reads
@@ -34,7 +36,7 @@ general **extra(int &nItem,const char *outfiles,int inputtype,argStruct *argumen
   int nit=0;
   //  printHd(hd,stderr);
   //change the number of method when adding a new one
-  general **tskStuff =new general*[18];
+  general **tskStuff =new general*[20];
   tskStuff[nit++] = new filter(arguments);//0
   tskStuff[nit++] = new getFasta(arguments);
   tskStuff[nit++] = new countCls(outfiles,arguments,inputtype);
@@ -53,6 +55,8 @@ general **extra(int &nItem,const char *outfiles,int inputtype,argStruct *argumen
   tskStuff[nit++] = new snptools(outfiles,arguments,inputtype);
   tskStuff[nit++] = new hetplas(outfiles,arguments,inputtype);//16
   tskStuff[nit++] = new plink(outfiles,arguments,inputtype);//17
+  tskStuff[nit++] = new abbababa(outfiles,arguments,inputtype);//18
+  tskStuff[nit++] = new fasta(outfiles,arguments,inputtype);//19
   //add yours here:
 
 

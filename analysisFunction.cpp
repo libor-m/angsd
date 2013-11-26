@@ -483,7 +483,7 @@ double *angsd::readDouble(const char*fname,int hint){
   res.push_back(atof(strtok(buf,"\t\n ")));
   char *tok=NULL;
   while((tok=strtok(NULL,"\t\n "))) {  
-    fprintf(stderr,"%s\n",tok);
+    //fprintf(stderr,"%s\n",tok);
     res.push_back(atof(tok));
 
   }

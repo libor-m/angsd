@@ -40,7 +40,7 @@ baq_adjustMapQ.o: baq_adjustMapQ.cpp baq_adjustMapQ.h kprobaln.o
 
 
 
-general.o: general.cpp general.h shared.o analysisCovar.cpp analysisEstError.o analysisCallGenotypes.o  angsd_realSFS.cpp analysisEstLikes.cpp analysisMajorMinor.cpp getFasta.cpp analysisCount.cpp analysisAsso.cpp analysisFunction.o analysisKeepList.cpp  analysisKeepList.o thorfinn.o snpStat.o analysisHWE.o analysisAnsError.cpp getFasta.o snptools.cpp hetplas.cpp writePlink.cpp
+general.o: general.cpp general.h shared.o analysisCovar.cpp analysisEstError.o analysisCallGenotypes.o  angsd_realSFS.cpp analysisEstLikes.cpp analysisMajorMinor.cpp getFasta.cpp analysisCount.cpp analysisAsso.cpp analysisFunction.o analysisKeepList.cpp  analysisKeepList.o thorfinn.o snpStat.o analysisHWE.o analysisAnsError.cpp getFasta.o snptools.cpp hetplas.cpp writePlink.cpp analysisAbbababa.cpp analysisFasta.cpp
 	$(CXX) $(FLAGS) -c general.cpp
 
 

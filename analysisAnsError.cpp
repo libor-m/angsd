@@ -11,7 +11,7 @@
 #include "shared.h"
 #include <cmath>
 #include "analysisFunction.h"
-
+#include<cstdlib>
 
 class ansErr:public general{
 public:
@@ -173,24 +173,10 @@ void ansErr::print(funkyPars *pars){
     }
   }
   else if(doAnsError==1){
-   
-    for(int s=0;s<pars->numSites;s++){
-      if(pars->keepSites[s]==0)
-	continue;
-
-      if(sample){
-	for(int i=0;i<pars->nInd;i++){
-	  for(int j=0;j<pars->chk->nd[s][i].l;j++){
-	    if(pars->chk->nd[s][i].qs[j]>=minQ){
-	      alleleCounts[i][pars->anc[s]*25+pars->ref[s]*5+refToInt[pars->chk->nd[s][i].seq[j]]]++;
-	      alleleCountsChr[i][pars->anc[s]*25+pars->ref[s]*5+refToInt[pars->chk->nd[s][i].seq[j]]]++;
-	      break;
-	    }
-	  }
-	}
-      }
-      else{
-
+    if(sample==0){//use all reads
+      for(int s=0;s<pars->numSites;s++){
+	if(pars->keepSites[s]==0)
+	  continue;
 	for(int i=0;i<pars->nInd;i++){
 	  for(int j=0;j<pars->chk->nd[s][i].l;j++){
 	    if(pars->chk->nd[s][i].qs[j]>=minQ){
@@ -201,8 +187,38 @@ void ansErr::print(funkyPars *pars){
 	}
       }
     }
+    if(sample==1){//random number read
+      for(int s=0;s<pars->numSites;s++){
+	if(pars->keepSites[s]==0)
+	  continue;
+	for(int i=0;i<pars->nInd;i++){
+	  if(pars->chk->nd[s][i].l==0)
+	    continue;
+	  int j = std::rand() % pars->chk->nd[s][i].l;
+	  if(pars->chk->nd[s][i].qs[j]>=minQ){
+	    alleleCounts[i][pars->anc[s]*25+pars->ref[s]*5+refToInt[pars->chk->nd[s][i].seq[j]]]++;
+	    alleleCountsChr[i][pars->anc[s]*25+pars->ref[s]*5+refToInt[pars->chk->nd[s][i].seq[j]]]++;
+	  }
+	}
+      }
+    }
+    if(sample==2){//take first read
+      for(int s=0;s<pars->numSites;s++){
+	if(pars->keepSites[s]==0)
+	  continue;
+	for(int i=0;i<pars->nInd;i++){
+	  for(int j=0;j<pars->chk->nd[s][i].l;j++){
+	    if(pars->chk->nd[s][i].qs[j]>=minQ){
+	      alleleCounts[i][pars->anc[s]*25+pars->ref[s]*5+refToInt[pars->chk->nd[s][i].seq[j]]]++;
+	      alleleCountsChr[i][pars->anc[s]*25+pars->ref[s]*5+refToInt[pars->chk->nd[s][i].seq[j]]]++;
+	      break;
+	    }
+	  }
+	}
+      }
+    }
   }
-
+   
 
   if(doAnsError==1){
     if(currentChr==-1)

@@ -29,8 +29,8 @@ void reader_sim::getOptions(argStruct *arguments){
     arguments->nInd = nInd2;
   else
     arguments->nInd = nInd;  
-  fprintf(stderr,"arguments->nind==%d\n",arguments->nInd);
-  fprintf(stderr,"nind2=%d\n",nInd2);
+  //  fprintf(stderr,"arguments->nind==%d\n",arguments->nInd);
+  //fprintf(stderr,"nind2=%d\n",nInd2);
   //make dummy header and reverse lookup table
   arguments->hd = new aHead;
   arguments->hd->text=NULL;arguments->hd->l_text=0;

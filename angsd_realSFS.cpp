@@ -1,4 +1,3 @@
-//must set ntrheads to 1
 #include <cstdio>
 
 #include "shared.h"
@@ -20,7 +19,7 @@ typedef struct{
   Filipe guera
 */
 namespace filipe{
-  void algoJoint(double **liks,char *anc,int nsites,int numInds,int underFlowProtect, int fold,int *keepSites,realRes *r,int noTrans,int doRealSFS,char *major,char *minor,double *freq,double *indF);
+  void algoJoint(double **liks,char *anc,int nsites,int numInds,int underFlowProtect, int fold,int *keepSites,realRes *r,int noTrans,int doRealSFS,char *major,char *minor,double *freq,double *indF,int newDim);
 }
 
 
@@ -38,7 +37,7 @@ class realSFS : public general{
   char *pest;
   double *prior; //<- outputfile form pest;
   int doThetas;
-  void fin(funkyPars *p,int index,double *prior,gzFile fpgz);
+  void calcThetas(funkyPars *p,int index,double *prior,gzFile fpgz);
 
   double aConst;
   double aConst2;
@@ -48,6 +47,8 @@ class realSFS : public general{
 
   double *filipeIndF;
 
+  int newDim;
+  void algoJointPost(double **post,int nSites,int nInd,int *keepSites,realRes *r,int doFold);
 public:
   //none optional stuff
   FILE *outfile;
@@ -128,6 +129,7 @@ void realSFS::getOptions(argStruct *arguments){
   int GL = 0;
   GL = angsd::getArg("-GL",GL,arguments);
   doThetas= angsd::getArg("-doThetas",doThetas,arguments);
+
   if(doRealSFS==0&&doThetas==0&&doSFS==0)
     return;
   if(doThetas!=0&& doRealSFS==0){
@@ -156,9 +158,12 @@ void realSFS::getOptions(argStruct *arguments){
     fprintf(stderr,"Must supply -anc for polarizing the spectrum\n");
     exit(0);
   }
-  if(pest!=NULL)
-    prior=angsd::readDouble(pest,arguments->nInd*2+1);
-
+  if(pest!=NULL){
+    if(fold==0)
+      prior=angsd::readDouble(pest,arguments->nInd*2+1);
+    else
+      prior=angsd::readDouble(pest,arguments->nInd+1);
+  }
   if(GL==0 &&arguments->inputtype==7){//DRAGON this is not enough, but this is most likely what everyone done...
     fprintf(stderr,"Must supply genotype likelihoods (-GL [INT])\n");
     printArg(arguments->argumentFile);
@@ -209,7 +214,7 @@ realSFS::realSFS(const char *outfiles,argStruct *arguments,int inputtype){
   outfileSFS = NULL;
   outfileSFSPOS = NULL;
   fpgz = Z_NULL;
-
+ 
   if(arguments->argc==2){
     if(!strcmp(arguments->argv[1],"-realSFS")){
       printArg(stdout);
@@ -225,29 +230,49 @@ realSFS::realSFS(const char *outfiles,argStruct *arguments,int inputtype){
   
   if(doRealSFS==0&&doSFS==0)
     return;
+  
+  newDim = 2*arguments->nInd+1;
+  if(fold)
+    newDim = arguments->nInd+1;
+  
   if((doSFS!=0||doRealSFS!=0)&&doThetas==0){
     outfileSFS =  openFile(outfiles,SFS);
     outfileSFSPOS =  openFile(outfiles,SFSPOS);
   }else{
     fpgz = openFileGz(outfiles,THETAS,"w6h");;
-
+    gzprintf(fpgz,"#Chromo\tPos\tWatterson\tPairwise\tthetaD\tthetaSingleton\tthetaH\tthetaL\n");
     aConst=0;
     int nChr = 2*arguments->nInd;
     for(int i=1;i<nChr;i++)
-    aConst += 1.0/i;
+      aConst += 1.0/i;
     aConst = log(aConst);//this is a1
+    
+    
+    aConst2 = log((nChr*(nChr-1))/2.0);//choose(nChr,2)
+    aConst3 = log((1.0*nChr-1.0));
+    
+    scalings = new double [nChr+1];
+    for(int i=0;i<nChr+1;i++)
+      scalings[i] = log(i)+log(nChr-i);
+    
+    
+    if(fold){
+      for(int i=0;i<newDim-1;i++)// we shouldn't touch the last element
+	scalings[i] = log(exp(scalings[i]) + exp(scalings[2*arguments->nInd-i]))-log(2.0);//THORFINN NEW
+      
+    }
 
-  
-   aConst2 = log((nChr*(nChr-1))/2.0);//choose(nChr,2)
-   aConst3 = log((1.0*nChr-1.0));
+#if 0//just for printing the scalings
+    int lim = nChr;
+    if(fold)
+      lim = newDim;
+    for(int i=0;i<newDim;i++)
+      fprintf(stderr,"SCAL[%d]\t%f\n",i,scalings[i]);
 
-   scalings = new double [nChr+1];
-  for(int i=0;i<nChr+1;i++)
-    scalings[i] = log(i)+log(nChr-i);
-
-
+#endif
 
   }
+  
 }
 
 
@@ -291,7 +316,7 @@ int isSame(double a,double b,double tolerance){
 }
 
 
-void filipe::algoJoint(double **liks,char *anc,int nsites,int numInds,int underFlowProtect, int fold,int *keepSites,realRes *r,int noTrans,int doRealSFS,char *major,char *minor,double *freq,double *indF) {
+void filipe::algoJoint(double **liks,char *anc,int nsites,int numInds,int underFlowProtect, int fold,int *keepSites,realRes *r,int noTrans,int doRealSFS,char *major,char *minor,double *freq,double *indF,int newDim) {
   //  fprintf(stderr,"liks=%p anc=%p nsites=%d nInd=%d underflowprotect=%d fold=%d keepSites=%p r=%p\n",liks,anc,nsites,numInds,underFlowProtect,fold,keepSites,r);
   int myCounter =0;
 
@@ -501,7 +526,7 @@ void filipe::algoJoint(double **liks,char *anc,int nsites,int numInds,int underF
      */    
 
     if(fold) {
-      int newDim = numInds+1;
+      //newDim is set in constructor
       for(int i=0;i<newDim-1;i++)// we shouldn't touch the last element
 	sumMinors[i] = log(sumMinors[i] + sumMinors[2*numInds-i]);//THORFINN NEW
       sumMinors[newDim-1] = log(sumMinors[newDim-1])+log(2.0);
@@ -531,7 +556,7 @@ void filipe::algoJoint(double **liks,char *anc,int nsites,int numInds,int underF
   
 }
 
-void algoJointPost(double **post,int nSites,int nInd,int *keepSites,realRes *r,int doFold){
+void realSFS::algoJointPost(double **post,int nSites,int nInd,int *keepSites,realRes *r,int doFold){
   int myCounter =0;
   for(int s=0;s<nSites;s++){
     if(keepSites[s]==0)
@@ -556,10 +581,8 @@ void algoJointPost(double **post,int nSites,int nInd,int *keepSites,realRes *r,i
     }
     for(int i=0;i<(2*nInd+1);i++)
       hj[i] =  log(hj[i])-lbico(2*nInd,i);
-    int newDim = 2*nInd+1;
-    
+       
     if(doFold){
-      newDim=nInd+1;
       for(int i=0;i<newDim-1;i++)// we shouldn't touch the last element
 	hj[i] = log(exp(hj[i]) + exp(hj[2*nInd-i]));
       hj[newDim-1] = hj[newDim-1]+log(2.0);
@@ -577,7 +600,7 @@ void algoJointPost(double **post,int nSites,int nInd,int *keepSites,realRes *r,i
 
 
 void algoJoint(double **liks,char *anc,int nsites,int numInds,int underFlowProtect, int fold,int *keepSites,realRes *r,int noTrans) {
-  //  fprintf(stderr,"liks=%p anc=%p nsites=%d nInd=%d underflowprotect=%d fold=%d keepSites=%p r=%p\n",liks,anc,nsites,numInds,underFlowProtect,fold,keepSites,r);
+
   int myCounter =0;
   if(anc==NULL||liks==NULL){
     fprintf(stderr,"problems receiving data in [%s] will exit (likes=%p||ancestral=%p)\n",__FUNCTION__,liks,anc);
@@ -797,10 +820,17 @@ void realSFS::run(funkyPars  *p){
   if(doRealSFS==1)
     algoJoint(p->likes,p->anc,p->numSites,p->nInd,underFlowProtect,fold,p->keepSites,r,noTrans);
   else if(doRealSFS==2)
-    filipe::algoJoint(p->likes,p->anc,p->numSites,p->nInd,underFlowProtect,fold,p->keepSites,r,noTrans,doRealSFS,p->major,p->minor,p->results->asso->freq,filipeIndF);
+    filipe::algoJoint(p->likes,p->anc,p->numSites,p->nInd,underFlowProtect,fold,p->keepSites,r,noTrans,doRealSFS,p->major,p->minor,p->results->asso->freq,filipeIndF,newDim);
   
   if(doSFS)
     algoJointPost(p->post,p->numSites,p->nInd,p->keepSites,r,fold);
+  //we will now need to do 2 things.
+  /*
+    1) fold if needed
+    2) add prior to calculate posteriors
+    
+   */
+
 
   p->extras[index] = r;
 }
@@ -822,63 +852,70 @@ void realSFS::clean(funkyPars *p){
 
 }
 
-void printFull(funkyPars *p,int index,FILE *outfileSFS,FILE *outfileSFSPOS,char *chr,int folded){
 
- realRes *r=(realRes *) p->extras[index];
- int id=0;
- 
- for(int i=0; (i<p->numSites);i++)
-   if(r->oklist[i]==1)
-     if(folded==0)
-       fwrite(r->pLikes[id++],sizeof(double),2*p->nInd+1,outfileSFS);
-     else
-       fwrite(r->pLikes[id++],sizeof(double),p->nInd+1,outfileSFS);
- for(int i=0;i<p->numSites;i++)
-   if(r->oklist[i]==1)
-     fprintf(outfileSFSPOS,"%s\t%d\n",chr,p->posi[i]+1);
-   else if (r->oklist[i]==2)
-     fprintf(stderr,"PROBS at: %s\t%d\n",chr,p->posi[i]+1);
 
+
+void printFull(funkyPars *p,int index,FILE *outfileSFS,FILE *outfileSFSPOS,char *chr,int newDim){
+
+  realRes *r=(realRes *) p->extras[index];
+  int id=0;
+  
+  for(int s=0; s<p->numSites;s++){
+    if(r->oklist[s]==1)
+      fwrite(r->pLikes[id],sizeof(double),newDim,outfileSFS);
+    id++;
+  }
+  for(int i=0;i<p->numSites;i++)
+    if(r->oklist[i]==1)
+      fprintf(outfileSFSPOS,"%s\t%d\n",chr,p->posi[i]+1);
+    else if (r->oklist[i]==2)
+      fprintf(stderr,"PROBS at: %s\t%d\n",chr,p->posi[i]+1);
+  
 }
 
 
-void realSFS::fin(funkyPars *pars,int index,double *prior,gzFile fpgz){
+void realSFS::calcThetas(funkyPars *pars,int index,double *prior,gzFile fpgz){
  realRes *r=(realRes *) pars->extras[index];
  int id=0;
  
- for(int i=0; (i<pars->numSites);i++){
+ for(int i=0; i<pars->numSites;i++){
    
    if(r->oklist[i]==1){
-     double *tmp = r->pLikes[id++];
-     for(int ii=0;ii<2*pars->nInd+1;ii++)
-       tmp[ii] += prior[ii]; //take loglike from sfs, and add the logprior
-   
-     normalize_array2(tmp,2*pars->nInd+1);
-
-     //now tmp contains our posterior expectation of the different classes of frequencies
-     double *workarray = tmp;
+     double *workarray = r->pLikes[id++];
     
      //First find thetaW: nSeg/a1
-     double pv = 1-exp(workarray[0])-exp(workarray[2*pars->nInd]);
-     double seq;
-     if(pv<0)
-       seq=log(0.0);
+     double pv,seq;
+     if(fold)
+       pv = 1-exp(workarray[0]);
      else
-       seq =log(1-exp(workarray[0])-exp(workarray[2*pars->nInd]))-aConst;
-     //     fprintf(stderr,"seq=%f exp0=%f exp2=%f \n",seq,exp(workarray[0]),exp(workarray[2*pars->nInd]));
+       pv = 1-exp(workarray[0])-exp(workarray[2*pars->nInd]);
+     
+     if(pv<0)//catch underflow
+       seq=log(0.0);
+     
+     seq = log(pv)-aConst;//watterson
+     gzprintf(fpgz,"%s\t%d\t%f\t",header->name[pars->refId],pars->posi[i]+1,seq);
 
-    double pairwise=0;    //Find theta_pi the pairwise
-    double thL=0;    //Find thetaL sfs[i]*i;
-    double thH=0;//thetaH sfs[i]*i^2
-    for(size_t ii=1;ii<2*pars->nInd;ii++){
-
-      pairwise += exp(workarray[ii]+scalings[ii] );
-      double li=log(ii);
-      
-      thL += exp(workarray[ii])*ii;
-      thH += exp(2*li+workarray[ii]);
-    }
-    gzprintf(fpgz,"%s\t%d\t%f\t%f\t%f\t%f\t%f\n",header->name[pars->refId],pars->posi[i]+1,seq,log(pairwise)-aConst2,workarray[1],log(thH)-aConst2,log(thL)-aConst3);
+     if(fold==0) {
+       double pairwise=0;    //Find theta_pi the pairwise
+       double thL=0;    //Find thetaL sfs[i]*i;
+       double thH=0;//thetaH sfs[i]*i^2
+       for(size_t ii=1;ii<2*pars->nInd;ii++){
+	 
+	 pairwise += exp(workarray[ii]+scalings[ii] );
+	 double li=log(ii);
+	 
+	 thL += exp(workarray[ii])*ii;
+	 thH += exp(2*li+workarray[ii]);
+       }
+       gzprintf(fpgz,"%f\t%f\t%f\t%f\n",log(pairwise)-aConst2,workarray[1],log(thH)-aConst2,log(thL)-aConst3);
+     }else{
+       double pairwise=0;    //Find theta_pi the pairwise
+       for(size_t ii=1;ii<newDim;ii++)
+	 pairwise += exp(workarray[ii]+scalings[ii] );
+       
+       gzprintf(fpgz,"%f\t-Inf\t-Inf\t-Inf\n",log(pairwise)-aConst2);
+     }
    }else if(r->oklist[i]==2)
      fprintf(stderr,"PROBS at: %s\t%d\n",header->name[pars->refId],pars->posi[i]+1);
  }
@@ -890,15 +927,38 @@ void realSFS::fin(funkyPars *pars,int index,double *prior,gzFile fpgz){
 void realSFS::print(funkyPars *p){
   if(p->numSites==0||(doRealSFS==0 && doSFS==0))
     return;
- 
- if(doRealSFS>0&&prior==NULL)
-   printFull(p,index,outfileSFS,outfileSFSPOS,header->name[p->refId],fold);
- else if(doThetas==1&&doRealSFS==1&&prior!=NULL)
-   fin(p,index,prior,fpgz);
- 
- if(doSFS>0&&prior==NULL)
-   printFull(p,index,outfileSFS,outfileSFSPOS,header->name[p->refId],fold);
+  //  fprintf(stderr,"newDim:%d\n",newDim);
+  realRes *r=(realRes *) p->extras[index];
+  int id=0;
+  //first addprior if this has been supplied
+  if(prior!=NULL){
+    for(int s=0; s<p->numSites;s++) {
+      double *workarray = NULL;
+      if(r->oklist[s]==1)
+	workarray = r->pLikes[id++];
+      else
+	continue;
+      
+      double tsum =exp(workarray[0] + prior[0]);
+      for(int i=1;i<newDim;i++)
+	tsum += exp(workarray[i]+prior[i]);
+      tsum = log(tsum);
+    
+    for(int i=0;i<newDim;i++)
+      workarray[i] = workarray[i]+prior[i]-tsum;
+    
+    
+    //pLikes now contains our posterior expectation of the different classes of frequencies
+    }
+  }
+
+  if(doThetas==0)
+    printFull(p,index,outfileSFS,outfileSFSPOS,header->name[p->refId],newDim);
+  else 
+    calcThetas(p,index,prior,fpgz);
+    
 }
+
 
 
 

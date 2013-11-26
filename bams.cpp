@@ -300,7 +300,7 @@ int bam_read2(BGZF *fp,aRead & b){
   return 1;
 }
 
-
+//DRAGON, make sure that all hd->names are allocated with malloc or new. Dont' remember what is used.
 void dalloc(aHead *hd){
   delete [] hd->text;
   delete [] hd->l_name;

@@ -76,10 +76,10 @@
 typedef struct {
   int l_text;
   char *text;//len is l_text
-  int n_ref;
-  int *l_name;//len is length of chromoname
+  int n_ref;//number of chromosomes
+  int *l_name;//length of chromoname name
   char **name;//name[n_ref][l_name]
-  int *l_ref;//length of reference
+  int *l_ref;//length of the chromosome
 }aHead;
 
 /*

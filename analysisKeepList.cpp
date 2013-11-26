@@ -8,16 +8,13 @@
 
   It can also be used for filtering away those sites not included in the -filter file.keep
 
-  Or you can supply a bimfile, and then the major/minor from the bim file will be used as major/minor throughout the program
-
-
  */
 #include <cassert>
-#include "pthread.h"
 #include "shared.h"
 #include "general.h"
 #include "analysisFunction.h"
 #include "analysisKeepList.h"
+#include "timeTools.cpp"
 
 #define BIN ".bin"
 #define IDX ".idx"
@@ -33,7 +30,7 @@ char *append(const char *one,const char*two){
 
 
 filt *filt_read(const char *fname){
-  fprintf(stderr,"\t->[%s] Reading binary representation:%s\n",__FILE__,fname);
+  fprintf(stderr,"\t-> [%s] Reading binary representation:%s\n",__FILE__,fname);
   filt *ret = new filt;
   ret->bg =NULL;
   ret->fp =NULL;
@@ -42,6 +39,11 @@ filt *filt_read(const char *fname){
   ret->curLen =0;
   char *bin_name=append(fname,BIN);
   char *idx_name=append(fname,IDX);
+
+  if(isNewer(fname,bin_name)||isNewer(fname,idx_name)){
+    fprintf(stderr,"\t-> Potential problem: File: \'%s\' looks newer than files: \'%s\',\'%s\'\n will exit",fname,bin_name,idx_name);
+    exit(0);
+  }
 
   ret->fp= fopen(idx_name,"r");
   ret->bg=bgzf_open(bin_name,"r");
@@ -83,7 +85,7 @@ filt *filt_read(const char *fname){
 
 
 void filt_gen(const char *fname,std::map<char*,int,ltstr>* revMap,aHead *hd){
-  fprintf(stderr,"Filterfile: %s supplied will generate binary representations...\n",fname);
+  fprintf(stderr,"\t-> Filterfile: %s supplied will generate binary representations...\n",fname);
   std::map<char*,int,ltstr>::const_iterator it;
   for(it= revMap->begin();0&&it!=revMap->end();++it)
     fprintf(stderr,"%s->%d->%d\n",it->first,it->second,hd->l_ref[it->second]);
@@ -115,11 +117,9 @@ void filt_gen(const char *fname,std::map<char*,int,ltstr>* revMap,aHead *hd){
   int last=-1;
   int nCols = -1;
   char buf[LENS];
-  //  gzread(gz,buf,LENS);
 
-  ////  char *rd=gzgets(gz,buf,LENS);
-  //fprintf(stderr,"rd=%s LENS=%d\n",buf,LENS);
-  while(gzgets(gz,buf,LENS)){
+  extern int SIG_COND;
+  while(SIG_COND && gzgets(gz,buf,LENS)){
     char chr[LENS] ;int id=-1;
     int posi=-1;
     char maj='N';
@@ -128,6 +128,15 @@ void filt_gen(const char *fname,std::map<char*,int,ltstr>* revMap,aHead *hd){
     int nRead=sscanf(buf,"%s\t%d\t%c\t%c\n",chr,&posi,&maj,&min);
     
     posi--;
+    if(nRead!=2&&nRead!=4){
+      fprintf(stderr,"\t-> Filterfile must have either 2 columns or 4 columns\n");
+      exit(0);
+    }
+    if(posi<0){
+      fprintf(stderr,"\t-> Problem with entry in filterfile\n");
+      fprintf(stderr,"\t-> Offending line looks like:\'%s\'\n",buf);
+    }
+    
     assert(nRead!=0);
     if(nCols==-1)
       nCols=nRead;
@@ -135,7 +144,6 @@ void filt_gen(const char *fname,std::map<char*,int,ltstr>* revMap,aHead *hd){
     fprintf(stderr,"nRead=%d: %s %d %c %c\n",nRead,chr,posi,maj,min);
     exit(0);
 #endif    
-    assert(nRead==nRead);
     it = revMap->find(chr);
     if(it==revMap->end()){
       fprintf(stderr,"chr: %s from filterfile: %s doesn't exist in index, will exit()\n",chr,fname);
@@ -165,7 +173,7 @@ void filt_gen(const char *fname,std::map<char*,int,ltstr>* revMap,aHead *hd){
       }
     }
     if(last!=id){
-      fprintf(stderr,"Allocing chr:%s\n",chr);
+      fprintf(stderr,"\t-> Parsing chr:\'%s\'\n",chr);
       std::map<int,char>::iterator it=mm.find(id);
       if(it!=mm.end()){
 	fprintf(stderr,"filter file, doesn't look sorted by chr, will exit()");
@@ -210,10 +218,15 @@ void filt_gen(const char *fname,std::map<char*,int,ltstr>* revMap,aHead *hd){
     }
   }
 
-  fprintf(stderr,"Filtering complete: Observed: %zu different chromosomes from file:%s\n",mm.size(),fname);
-
+  fprintf(stderr,"\t-> Filtering complete: Observed: %zu different chromosomes from file:%s\n",mm.size(),fname);
   mm.clear();
   gzclose(gz);fclose(fp);bgzf_close(cfpD);
+  
+  if(SIG_COND==0){
+    fprintf(stderr,"\n\t-> CTRL+C was detected, we will therefore assume that the build of the binary filterfiles are incomplete.\n\t-> Will therefore delete: \'%s\',\'%s\'\n",outnames_bin,outnames_idx);
+    unlink(outnames_bin);
+    unlink(outnames_idx);
+  }
 
 }
 
@@ -223,8 +236,14 @@ void filt_gen(const char *fname,std::map<char*,int,ltstr>* revMap,aHead *hd){
 filt *filt_init(const char *fname,std::map<char*,int,ltstr>* revMap,aHead *hd){
   char *bin_name=append(fname,BIN);
   char *idx_name=append(fname,IDX);
+  //First
+
+
   if(!fexists(bin_name)||!fexists(idx_name))
     filt_gen(fname,revMap,hd);
+  extern int SIG_COND;
+  if(SIG_COND==0)
+    return NULL;
   return  filt_read(fname);
 }
 
