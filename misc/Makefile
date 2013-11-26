@@ -1,11 +1,10 @@
-B1;2cCC=gcc
+CC=gcc
 CXX=g++
 
 FLAGS=-O3 
 
 
-
-all: optimSFS supersim sfstools emOptim calcStat bgid emOptim2 msToGlf
+all: supersim sfstools calcStat bgid emOptim2 msToGlf
 
 bfgs.o: bfgs.c bfgs.h
 	$(CC) $(FLAGS) -c bfgs.c
@@ -43,4 +42,4 @@ msToGlf: msToGlf6.c
 
 
 clean:
-	rm  -f *.o optimSFS simnextgen supersim emOptim calcStat sfstools bgid *~
+	rm  -f *.o optimSFS simnextgen supersim emOptim calcStat sfstools bgid emOptim2 *~

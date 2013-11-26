@@ -31,7 +31,7 @@ void callGenotypes::printArg(FILE *argFile){
   fprintf(argFile,"\t32: write the posterior probability of called gentype as binary\n");
   //  fprintf(argFile,"\t64: write the three posterior probability (Beagle style)\n");
   fprintf(argFile,"\t-> A combination of the above can be choosen by summing the values, EG write 0,1,2 types with majorminor as -doGeno 3\n");
-  fprintf(argFile,"\t-postCutoff=%f\t(-1 indicates no cutof)\n",postCutoff);
+  fprintf(argFile,"\t-postCutoff=%f (Only genotype to missing if below this threshold)\n",postCutoff);
  fprintf(argFile,"\t-geno_minDepth=%d\t(-1 indicates no cutof)\n",geno_minDepth);
  fprintf(argFile,"\n\tNB When writing the posterior the -postCutoff is not used\n\n");
  fprintf(argFile,"\n\tNB geno_minDepth requires -doCounts\n\n");
@@ -81,7 +81,7 @@ void callGenotypes::getOptions(argStruct *arguments){
 
 callGenotypes::callGenotypes(const char *outfiles,argStruct *arguments,int inputtype){
   doGeno=0;
-  postCutoff=-1;
+  postCutoff= 1.0/3.0;
   outfileZ = Z_NULL;
   geno_minDepth = -1;
   if(arguments->argc==2){
@@ -131,7 +131,7 @@ void callGenotypes::getGeno(funkyPars *pars){
 	maxPP=pars->post[s][i*3+2];
 	maxGeno=2;
       }
-      if(maxPP<postCutoff)
+      if(maxPP<=postCutoff)
 	maxGeno=-1;
       if(geno_minDepth!=-1) {
 	int geno_Depth = pars->counts[s][i*4] + pars->counts[s][i*4+1] + pars->counts[s][i*4+2] + pars->counts[s][i*4+3];

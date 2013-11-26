@@ -1,3 +1,6 @@
+bases<-c("A","C","G","T")
+require("remix")
+
 ########### do not change ################3
 l<-commandArgs(TRUE)
 getArgs<-function(x,l)
@@ -194,7 +197,7 @@ over<-getover(r,nInd)
 
  
 
-brewer()
+
 nam<-paste(rep(bases,4),"->",rep(bases,each=4))[-c(1,6,11,16)]
 
 
