@@ -6,6 +6,8 @@
 #include "shared.h"
 #include <cmath>
 #include "analysisFunction.h"
+#include "analysisCallGenotypes.h"
+
 
 //filename of dumped file
 #define GENO ".geno.gz"
@@ -18,29 +20,6 @@
 #define GENO_WRITE_POST 16 //write the post of the called genotype
 #define GENO_FOR_COVAR 32 //binary dump of the posteriors.
 
-typedef struct{
-  int **dat;
-}genoCalls;
-
-
-class callGenotypes:public general{
-private:
-  int doGeno;
-  float postCutoff;
-  gzFile outfileZ;
-  
-public:
-  callGenotypes(const char *outfiles,argStruct *arguments,int inputtype);
-  ~callGenotypes();
-  void getOptions(argStruct *arguments);
-  void run(funkyPars  *pars);
-  void clean(funkyPars *pars);
-  void print(funkyPars *pars);
-  void printArg(FILE *argFile);
-  void getGeno(funkyPars *pars);
-  void printGeno(funkyPars *pars);
-  
-};
 void callGenotypes::printArg(FILE *argFile){
   fprintf(argFile,"-----------------\n%s:\n\n",__FILE__);
   fprintf(argFile,"-doGeno\t%d\n",doGeno);
@@ -80,8 +59,8 @@ void callGenotypes::getOptions(argStruct *arguments){
 
   }
 
-  if(doPost!=0&&doMaf==0){
-    fprintf(stderr,"\n\t-> You need -doMaf inorder to get posterior probabilities\n");
+  if(doPost==1&&doMaf==0){
+    fprintf(stderr,"\n\t-> You need -doMaf inorder to get posterior probabilities when using freq as prior\n");
     exit(0);
   }
 
@@ -103,7 +82,7 @@ callGenotypes::callGenotypes(const char *outfiles,argStruct *arguments,int input
 
   getOptions(arguments);
   printArg(arguments->argumentFile);
-  if(doGeno==0)
+  if(doGeno<=0)
     return;
 
 
@@ -155,23 +134,23 @@ void callGenotypes::printGeno(funkyPars *pars){
     fprintf(stderr,"\t->[%s] We would expect to have an array of keepsites\n",__FUNCTION__);
     exit(0);
   }
-
+  int doGenoInner = abs(doGeno);
   for(int s=0;s<pars->numSites;s++) {
     if(pars->keepSites[s]==0)
       continue;
-    if(!(doGeno&GENO_FOR_COVAR))
+    if(!(doGenoInner&GENO_FOR_COVAR))
       gzprintf(outfileZ,"%s\t%d\t",header->name[pars->refId],pars->posi[s]+1);
-    if(doGeno&GENO_MAJOR_MINOR&&!(doGeno&GENO_FOR_COVAR))
+    if(doGenoInner&GENO_MAJOR_MINOR&&!(doGenoInner&GENO_FOR_COVAR))
       gzprintf(outfileZ,"%c\t%c\t",intToRef[pars->major[s]],intToRef[pars->minor[s]]);
-    if(doGeno&GENO_FOR_COVAR){
+    if(doGenoInner&GENO_FOR_COVAR){
       gzwrite(outfileZ,pars->post[s],sizeof(double)*3*pars->nInd);
       continue;
     }
 
     for(int i=0;i<pars->nInd;i++){
-      if(doGeno&GENO_PRINT)
+      if(doGenoInner&GENO_PRINT)
 	gzprintf(outfileZ,"%d\t",geno->dat[s][i]);
-      if(doGeno&GENO_ALLELE){
+      if(doGenoInner&GENO_ALLELE){
 	if(geno->dat[s][i]==0)
 	  gzprintf(outfileZ,"%c%c\t",intToRef[pars->major[s]],intToRef[pars->major[s]]);
 	else if(geno->dat[s][i]==1)
@@ -182,9 +161,9 @@ void callGenotypes::printGeno(funkyPars *pars){
 	  gzprintf(outfileZ,"NN\t");
 
       }
-      if(doGeno&GENO_WRITE_POST)
+      if(doGenoInner&GENO_WRITE_POST)
 	gzprintf(outfileZ,"%f\t",pars->post[s][i*3+angsd::whichMax(&pars->post[s][i*3],3)]);
-      if(doGeno&GENO_ALL_POST)
+      if(doGenoInner&GENO_ALL_POST)
 	for(int n=0;n<3;n++)
 	  gzprintf(outfileZ,"%f\t",pars->post[s][i*3+n]);
     }
@@ -211,7 +190,7 @@ void callGenotypes::clean(funkyPars *pars){
 
 
 void callGenotypes::print(funkyPars *pars){
-  if(doGeno==0)
+  if(doGeno<=0)
     return;
   
   genoCalls *geno =(genoCalls *) pars->extras[index];

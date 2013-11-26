@@ -76,8 +76,8 @@ void frequency::printArg(FILE *argFile){
   fprintf(argFile,"\t-eps\t%f [Only used for -doMaf &32]\n",eps);
   fprintf(argFile,"-doPost\t%d\t(Calculate posterior prob 3xgprob)\n",doPost);
   fprintf(argFile,"\t1: Using frequency as prior\n");
-  fprintf(argFile,"\t1: Using uniform prior\n");
-  fprintf(argFile,"-beagleProb\t%d\n",beagleProb);
+  fprintf(argFile,"\t2: Using uniform prior\n");
+  fprintf(argFile,"-beagleProb\t%d (Dump beagle style postprobs)\n",beagleProb);
   fprintf(argFile,"NB these frequency estimators requires major/minor -doMajorMinor\n");
   fprintf(argFile,"\n");
 
@@ -96,10 +96,11 @@ void frequency::getOptions(argStruct *arguments){
     inputIsBeagle =1;
 
   doMaf=angsd::getArg("-doMaf",doMaf,arguments);
+  doPost=angsd::getArg("-doPost",doPost,arguments);
   GL=angsd::getArg("-GL",GL,arguments);
   doSNP=angsd::getArg("-doSNP",doSNP,arguments);
   doMajorMinor=angsd::getArg("-doMajorMinor",doMajorMinor,arguments);
-  doPost=angsd::getArg("-doPost",doPost,arguments);
+
 
   double tmp=-1;
   tmp=angsd::getArg("-minMaf",tmp,arguments);
@@ -145,10 +146,10 @@ void frequency::getOptions(argStruct *arguments){
 
   beagleProb=angsd::getArg("-beagleProb",beagleProb,arguments);
 
-  if(doMaf==0)
+  if(doMaf==0 &&doPost==0)
     return;
   if(inputtype!=5&&inputtype!=0&&doMajorMinor==0){
-    fprintf(stderr,"You must specify \'-doMajorMinor\' to infer major/minor when estimating MAF\n");
+    fprintf(stderr,"You must specify \'-doMajorMinor\' to infer major/minor \n");
     exit(0);
   }
 
@@ -181,6 +182,10 @@ void frequency::getOptions(argStruct *arguments){
     exit(0);
   }
 
+  if(doPost!=0 && doMajorMinor==0){
+    fprintf(stderr,"Do post requires major and minor: supply -doMajorMinor \n");
+    exit(0);
+  }
 }
 
 //constructor
@@ -207,12 +212,13 @@ frequency::frequency(const char *outfiles,argStruct *arguments,int inputtype){
   EM_START = 0.001;
 
   if(arguments->argc==2){
-    if(!strcmp(arguments->argv[1],"-doMaf")){
+    if(!strcmp(arguments->argv[1],"-doMaf")||!strcmp(arguments->argv[1],"-doPost")){
       printArg(stdout);
       exit(0);
     }else
       return;
   }
+
 
 
   
@@ -411,7 +417,7 @@ void frequency::clean(funkyPars *pars) {
 
 void frequency::run(funkyPars *pars) {
  
-  if(doMaf==0)
+  if(doMaf==0&&doPost==0)
     return;
   if(doMaf!=0) {
 
@@ -447,7 +453,7 @@ void frequency::run(funkyPars *pars) {
   }
   if(doPost){
     if(pars->likes==NULL){
-      fprintf(stderr,"[%s] likelihoods missing\n",__FUNCTION__);
+      fprintf(stderr,"[%s.%s()] likelihoods missing\n",__FILE__,__FUNCTION__);
       exit(0);
     }
     double **post = new double*[pars->numSites];

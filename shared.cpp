@@ -110,11 +110,13 @@ void destroy(){
   }
   pthread_mutex_unlock(&counterMut);
   fprintf(stderr,"\t-> Done waiting for threads\n");
-  for(int i=0;i<andersSux;i++)
+  for(int i=0;i<andersSux;i++){
+    //    fprintf(stderr,"i:%d\n",i);
+    fflush(stderr);
     delete allMethods[i];
-  
+  }
   delete [] allMethods;
-  
+  //  fprintf(stderr,"done destrying:\n");fflush(stderr);
 }
 
 

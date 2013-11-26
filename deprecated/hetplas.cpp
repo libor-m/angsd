@@ -1,14 +1,24 @@
 #include "analysisFunction.h"
 #include "shared.h"
 #include <ctype.h>
-#define MAX_QS 124
+#define MAX_QS 500
+
+
+static size_t fullDist[MAX_QS][MAX_QS][2];//<-strand
+static size_t majDist[MAX_QS][MAX_QS][2];//<-strand
+static size_t minDist[MAX_QS][MAX_QS][2];//<-strand
 
 //struct which contains the results for a single chunk
 typedef struct{
   double **freq;//contains the estimate of the freq of the 4 alleles and the unknown minor freq;
   double **llh;//contains the LRT and the llhNull llhAlt;
   int **nItr;
+  int **maxbases;//contains the allele of the maxbase
   double **diff;
+  size_t **qsMajor;
+  size_t **qsMinor;
+  size_t **majPosi;
+  size_t **minPosi;
 }resStruct;
 
 
@@ -16,6 +26,8 @@ double **gen_probs(){
   double **ret =new double*[MAX_QS];
   for(int i=0;i<MAX_QS;i++)
     ret[i] = new double[16];
+
+  
 
   for(int i=0;i<MAX_QS;i++){
     double p1 = log(1-pow(10,-i/10.0));
@@ -34,11 +46,17 @@ double **gen_probs(){
 
 class hetplas:public general{
 private:
+  const char *outfile_c;
   double **probs;
-  FILE *outputFile;
+  FILE *fp;
+  FILE *fptest;
+  FILE *fptest2;
+  FILE *fptestpo;
+  FILE *fptestop;
+  FILE *fpwhichmax;
   int minQ;
 public:
-
+  void calcQsDists(int,size_t*,size_t*,size_t *,size_t*,tNode *);
   int doHetPlas;
   int makellhs(tNode*,double**,int*);
   void doNew(funkyPars *pars);
@@ -143,6 +161,22 @@ double em3(double *x,double **liks,int seqdepth,int maxIter,double tole,int &itr
 
 }
 
+void hetplas::calcQsDists(int major,size_t *qsMajor,size_t *qsMinor,size_t *majPosi,size_t*minPosi,tNode *tn){
+
+  for(int l=0;l<tn->l;l++){
+    int oBase = refToInt[tn->seq[l]];
+    if(refToInt[tn->seq[l]]!=4&&tn->qs[l]>=minQ){
+      if(oBase==major){
+	qsMajor[tn->qs[l]]++;
+	//fprintf(stderr,"%d\n",tn->posi[l]);
+	majPosi[tn->posi[l]]++;
+      }else{
+	qsMinor[tn->qs[l]]++;
+	minPosi[tn->posi[l]]++;
+      }
+    }
+  }
+}
 
 
 
@@ -154,7 +188,11 @@ void hetplas::doNew(funkyPars *pars){
   rs->llh= new double*[pars->numSites]; 
   rs->nItr = new int*[pars->numSites];
   rs->diff = new double *[pars->numSites];
-
+  rs->qsMajor = new size_t *[pars->numSites];
+  rs->qsMinor = new size_t *[pars->numSites];
+  rs->majPosi = new size_t *[pars->numSites];
+  rs->minPosi = new size_t *[pars->numSites];
+  rs->maxbases=new int*[pars->numSites];
 
   double **liks = new double*[4];
   int oldsize =0;
@@ -165,7 +203,16 @@ void hetplas::doNew(funkyPars *pars){
       rs->llh[s] = new double [3*pars->nInd];  
       rs->diff[s] = new double [pars->nInd];  
       rs->nItr[s] = new int [pars->nInd];  
-
+      rs->qsMajor[s] = new size_t[MAX_QS];
+      memset(rs->qsMajor[s],0,MAX_QS*sizeof(size_t));
+      rs->qsMinor[s] = new size_t[MAX_QS];
+      memset(rs->qsMinor[s],0,MAX_QS*sizeof(size_t));
+      rs->majPosi[s]=new size_t[MAX_QS];
+      memset(rs->majPosi[s],0,MAX_QS*sizeof(size_t));
+      rs->minPosi[s]=new size_t[MAX_QS];
+      memset(rs->minPosi[s],0,MAX_QS*sizeof(size_t));
+      rs->maxbases[s] = new int[pars->nInd];
+      memset(rs->maxbases[s],0,sizeof(int)*pars->nInd);      
       for(int i=0;i<pars->nInd;i++){
 	int seqdepth=makellhs(&pars->chk->nd[s][i],liks,&oldsize);
 	if(seqdepth==0){
@@ -176,6 +223,7 @@ void hetplas::doNew(funkyPars *pars){
 	//¯	fprintf(stderr,"lik=%f\n",like(par,liks,seqdepth));
 	em3(par,liks,seqdepth,100,1e-6,rs->nItr[s][i],rs->diff[s][i]);
 	int maxBase=angsd::whichMax(par,4);
+	rs->maxbases[s][i]=maxBase;
 	//assert(maxBase!=-1);//<- if vals are equal...
 	if(maxBase==-1){
 	  fprintf(stderr,"CHECK SITE: %d  par=(%f,%f,%f,%f) seqdepth=%d\n",pars->posi[s]+1,par[0],par[1],par[2],par[3],seqdepth);
@@ -195,7 +243,7 @@ void hetplas::doNew(funkyPars *pars){
 	rs->llh[s][i*3]=2*llhNeu-2*llhAlt;
 	rs->llh[s][i*3+1]=llhNeu;
 	rs->llh[s][i*3+2]=llhAlt;
-
+	calcQsDists(maxBase,rs->qsMajor[s],rs->qsMinor[s],rs->majPosi[s],rs->minPosi[s],&pars->chk->nd[s][i]);
       }
       
     }
@@ -254,17 +302,69 @@ void hetplas::print(funkyPars *pars){
     resStruct *rs =(resStruct *) pars->extras[index];
     for(int s=0;s<pars->numSites;s++)
       if(pars->keepSites[s]){
-	fprintf(outputFile,"%s\t%d",header->name[pars->refId],pars->posi[s]+1);
+	fprintf(fp,"%s\t%d",header->name[pars->refId],pars->posi[s]+1);
 	for(int i=0;i<pars->nInd;i++){
 	  //write freq
 	  for(int j=0;j<5;j++)
-	    fprintf(outputFile,"\t%f",rs->freq[s][i*4+j]);
+	    fprintf(fp,"\t%f",rs->freq[s][i*4+j]);
 	  for(int j=0;j<3;j++)
-	    fprintf(outputFile,"\t%f",rs->llh[s][i*3+j]);
-	  fprintf(outputFile,"\t%d\t%e",rs->nItr[s][i],rs->diff[s][i]);
+	    fprintf(fp,"\t%f",rs->llh[s][i*3+j]);
+	  fprintf(fp,"\t%d\t%e",rs->nItr[s][i],rs->diff[s][i]);
 	}
-	fprintf(outputFile,"\n");
+	fprintf(fp,"\n");
       }
+    for(int s=0;s<pars->numSites;s++){
+      if(pars->keepSites[s]){
+	for(int q=0;q<MAX_QS;q++)
+	  fprintf(fptest,"%zu\t",rs->qsMajor[s][q]);
+	fprintf(fptest,"\n");
+      }
+    }
+    for(int s=0;s<pars->numSites;s++){
+      if(pars->keepSites[s]){
+	for(int q=0;q<MAX_QS;q++)
+	  fprintf(fptest2,"%zu\t",rs->qsMinor[s][q]);
+	fprintf(fptest2,"\n");
+      }
+    }
+    for(int s=0;s<pars->numSites;s++){
+      if(pars->keepSites[s]){
+	for(int q=0;q<MAX_QS;q++)
+	  fprintf(fptestpo,"%zu\t",rs->majPosi[s][q]);
+	fprintf(fptestpo,"\n");
+      }
+    }
+    for(int s=0;s<pars->numSites;s++){
+      if(pars->keepSites[s]){
+	for(int q=0;q<MAX_QS;q++)
+	  fprintf(fptestop,"%zu\t",rs->minPosi[s][q]);
+	fprintf(fptestop,"\n");
+      }
+    }
+    for(int s=0;s<pars->numSites;s++){
+      if(pars->keepSites[s]==0)
+	continue;
+      for(int i=0;i<pars->nInd;i++) {
+	tNode *tn = &pars->chk->nd[s][i];
+	for(int l=0;l<tn->l;l++){
+	  if(tn->qs[l]<minQ||refToInt[tn->seq[l]]==4)
+	    continue;
+	  int b1 = refToInt[tn->seq[l]];
+	  int st = !isupper(tn->seq[l]);
+	  fullDist[tn->posi[l]][tn->qs[l]][st]++;
+	  if(b1==rs->maxbases[s][0])
+	    majDist[tn->posi[l]][tn->qs[l]][st]++;
+	  else
+	    minDist[tn->posi[l]][tn->qs[l]][st]++;
+	}
+
+      }
+    }
+    for(int s=0;s<pars->numSites;s++){
+      if(pars->keepSites[s]==0)
+	continue;
+      fprintf(fpwhichmax,"%d\t%d\n",pars->posi[s]+1,rs->maxbases[s][0]);
+    }
   }
 }
 
@@ -288,7 +388,8 @@ hetplas::hetplas(const char *outfiles,argStruct *arguments,int inputtype){
   doHetPlas =0;
   minQ = 13;
   probs=NULL;
-  outputFile=NULL;
+  outfile_c = outfiles;
+  
   if(arguments->argc==2){
     if(!strcmp(arguments->argv[1],"-doHetPlas")){
       printArg(stdout);
@@ -299,14 +400,16 @@ hetplas::hetplas(const char *outfiles,argStruct *arguments,int inputtype){
 
 
   getOptions(arguments);
-  if(doHetPlas>0&&arguments->nInd!=1){
-    fprintf(stderr,"Heteroplasmy analysis only implemented for single bamfiles\n");
-    exit(0);
-  }
-
+  if(doHetPlas)
+    fprintf(stderr,"running doHetPlas=%d\n",doHetPlas);
   if(doHetPlas){
     probs=gen_probs();
-    outputFile=openFile(outfiles,".hetGL");
+    fp=openFile(outfiles,".hetGL");
+    fptest=openFile(outfiles,".hetTest");
+    fptest2=openFile(outfiles,".hetTest2");
+    fptestpo=openFile(outfiles,".posi");
+    fptestop=openFile(outfiles,".isop");
+    fpwhichmax=openFile(outfiles,".whichmax");
   } 
 }
 
@@ -324,8 +427,22 @@ void printStuff(FILE *fp,size_t mat[MAX_QS][MAX_QS][2]){
 
 
 hetplas::~hetplas(){
-  if(outputFile)
-    fclose(outputFile);
+  if(doHetPlas){
+    fclose(fp);
+    fclose(fptest);
+    fclose(fptest2);
+    fclose(fptestpo);
+    fclose(fptestop);
+    FILE *myfp=openFile(outfile_c,".fullDist");
+    printStuff(myfp,fullDist);
+    fclose(myfp);
+    myfp=openFile(outfile_c,".majDist");
+    printStuff(myfp,majDist);
+    fclose(myfp);
+    myfp=openFile(outfile_c,".minDist");
+    printStuff(myfp,minDist);
+    fclose(myfp);
+  }
   
 }
 
