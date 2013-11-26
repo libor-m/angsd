@@ -10,7 +10,7 @@
   0.500 first major fixup will begin to remove loci
   0.501 continuing above
   0.534 many minor bugfixes
-  use
+  use wiki for updated
 */
 
 #include<iostream>//for printing time
@@ -24,7 +24,7 @@
 #include "shared.h"
 #include "multiReader.h"
 #include "mrStruct.h"
-#define VERSION 0.556
+#define VERSION 0.557
 #define ARGS ".arg"
 
 #include "parseArgs_bambi.h"

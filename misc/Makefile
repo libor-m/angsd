@@ -18,7 +18,7 @@ emOptim2: emOptim2.cpp
 thetaStat:	thetaStat.cpp stats.cpp ../kstring.o ../bgzf.o
 	$(CXX) $(FLAGS) thetaStat.cpp -I../  ../kstring.o ../bgzf.o ../knetfile.o -lz -o thetaStat
 msToGlf: msToGlf6.c
-	$(CC) $(FLAGS) msToGlf6.c -O3 -o msToGlf -std=gnu99 -lz -lm -Wno-unused-result
+	$(CC) $(FLAGS) msToGlf6.c -O3 -o msToGlf -std=gnu99 -lz -lm
 
 clean:
 	rm  -f *.o optimSFS simnextgen supersim emOptim calcStat bgid emOptim2 msToGlf thetaStat *~

@@ -862,9 +862,9 @@ void printFull(funkyPars *p,int index,FILE *outfileSFS,FILE *outfileSFSPOS,char 
   
   for(int s=0; s<p->numSites;s++){
     if(r->oklist[s]==1)
-      fwrite(r->pLikes[id],sizeof(double),newDim,outfileSFS);
-    id++;
+      fwrite(r->pLikes[id++],sizeof(double),newDim,outfileSFS);
   }
+  
   for(int i=0;i<p->numSites;i++)
     if(r->oklist[i]==1)
       fprintf(outfileSFSPOS,"%s\t%d\n",chr,p->posi[i]+1);
