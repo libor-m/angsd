@@ -466,13 +466,13 @@ void filipe::algoJoint(double **liks,char *anc,int nsites,int numInds,int underF
 	for(int i=0;i<(2*numInds+1);i++)
 	  if(underFlowProtect==0){
 	    if(doRealSFS == 2)
-	      sumMinors[i] += hj[i]/(1-hj[0]-hj[2*numInds]); //As in the PLoS ONE paper
+	      sumMinors[i] += hj[i]; //As in the PLoS ONE paper
 	    else
 	      sumMinors[i] += exp(log(hj[i])-lbico(2*numInds,i)+totmax);
 	  }else{
 	    if(doRealSFS == 2)
 	      sumMinors[i] =
-		exp(angsd::addProtect2(log(sumMinors[i]),hj[i]-log(1-hj[0]-hj[2*numInds])));
+		exp(angsd::addProtect2(log(sumMinors[i]),hj[i]));
 	    //As in the PLoS ONE paper
 	    else
 	      sumMinors[i] =

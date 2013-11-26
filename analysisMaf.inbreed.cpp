@@ -444,9 +444,9 @@ void frequency::run(funkyPars *pars) {
 	double freq=pars->results->asso->freq[s];
 	for(int i=0;i<pars->nInd;i++){
 	  //	  fprintf(stderr,"[%d]\nlik= %f %f %f\n",i,like[0][i*3+0],like[0][i*3+1],like[0][i*3+2]);
-	  post[s][i*3+2]=like[s][i*3+2]+2*log(freq);
-	  post[s][i*3+1]=like[s][i*3+1]+log(2)+log(1-freq)+log(freq);
-	  post[s][i*3+0]=like[s][i*3+0]+2*log(1-freq);
+	  post[s][i*3+2]=like[s][i*3+2]+log(pow(freq,2) + freq*(1-freq)*indF[i]);
+	  post[s][i*3+1]=like[s][i*3+1]+log(2*freq*(1-freq) - 2*freq*(1-freq)*indF[i]);
+	  post[s][i*3+0]=like[s][i*3+0]+log(pow(1-freq,2) + freq*(1-freq)*indF[i]);
 	  //	  fprintf(stderr,"likmod= %f %f %f\n",post[0][i*3+0],post[0][i*3+1],post[0][i*3+2]);
 	  double norm = angsd::addProtect3(post[s][i*3+0],post[s][i*3+1],post[s][i*3+2]);
 	  post[s][i*3+0]=exp(post[s][i*3+0]-norm);
