@@ -108,7 +108,7 @@ void dalloc(tindex idx){
    }else{
      //catch single point
      int isProper =0;
-     for(uint i=0;i<strlen(tok);i++)
+     for(size_t i=0;i<strlen(tok);i++)
        if(tok[i]=='-'){
 	 isProper=1;
 	 break;

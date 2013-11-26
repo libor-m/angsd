@@ -23,7 +23,7 @@
 #include "shared.h"
 #include "multiReader.h"
 #include "mrStruct.h"
-#define VERSION 0.552
+#define VERSION 0.553
 #define ARGS ".arg"
 
 #include "parseArgs_bambi.h"
@@ -151,7 +151,7 @@ void parseArgStruct(argStruct *arguments){
   std::vector<char*> delme = angsd::getFilenames(name,nInd);
   arguments->nInd=delme.size();
   
-  for(uint i=0;i<delme.size();i++)
+  for(size_t i=0;i<delme.size();i++)
     free(delme[i]);
  }
 

@@ -223,11 +223,11 @@ void readSFS(const char*fname,int hint,double *ret){
   //  fprintf(stderr,"size of prior=%lu\n",res.size());
   if(hint!=res.size()){
     fprintf(stderr,"problem with size of dimension of prior %d vs %lu\n",hint,res.size());
-    for(uint i=0;0&&i<res.size();i++)
-      fprintf(stderr,"%d=%f\n",i,res[i]);
+    for(size_t i=0;0&&i<res.size();i++)
+      fprintf(stderr,"%zu=%f\n",i,res[i]);
     exit(0);
   }
-  for(uint i=0;i<res.size();i++){
+  for(size_t i=0;i<res.size();i++){
     
     ret[i] = exp(res[i]);
     // fprintf(stderr,"i=%d %f\n",i,ret[i]);

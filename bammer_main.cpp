@@ -309,8 +309,8 @@ void (*func)(void *) = NULL;
 void printReg(FILE *fp,std::vector<regs> &regions){
   fprintf(fp,"-------------\n");
   fprintf(fp,"regions.size()=%lu\n",regions.size());
-  for(uint i=0;i<regions.size();i++)
-    fprintf(fp,"reg[%d]= %d %d %d\n",i,regions[i].refID,regions[i].start,regions[i].stop);
+  for(size_t i=0;i<regions.size();i++)
+    fprintf(fp,"reg[%zu]= %d %d %d\n",i,regions[i].refID,regions[i].start,regions[i].stop);
   fprintf(fp,"-------------\n");
 }
 

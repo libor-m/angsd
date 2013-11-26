@@ -382,11 +382,11 @@ void soap_likes::run(chunkyT *chk,double **lk,char *refs,int min_base_q,int trim
 
 void soap_likes::setCaliNames(int nInd){
   //  fprintf(stderr,"setcalinames\n");
-  for(uint i=0;i<nInd;i++){
+  for(size_t i=0;i<nInd;i++){
     char *ret1 = new char[128];
     char *ret2 = new char[128];
-    snprintf(ret1,128,"%s/%d.qual%d",tmpdir,i,i);
-    snprintf(ret2,128,"%s/%d.counts%d",tmpdir,i,i);
+    snprintf(ret1,128,"%s/%zu.qual%zu",tmpdir,i,i);
+    snprintf(ret2,128,"%s/%zu.counts%zu",tmpdir,i,i);
     if(strlen(ret1)>100||strlen(ret1)>100){
       fprintf(stderr,"Might be problems with to long filenames\n");
       fprintf(stderr,"Please check/modify this function: %s in file:%s\n",__FUNCTION__,__FILE__);
@@ -482,7 +482,7 @@ soap_likes::~soap_likes(){
       delete [] p_matrix[i];
     delete [] p_matrix;
   }
-  for(uint i=0;i<count_mat_names.size();i++){
+  for(size_t i=0;i<count_mat_names.size();i++){
     delete [] count_mat_names[i];
     delete [] p_mat_names[i];
   }

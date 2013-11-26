@@ -448,7 +448,7 @@ std::vector<char*> angsd::getFilenames(const char * name,int nInd){
     }
 #if 0
      for(size_t ii=0;ii<ret.size();ii++)
-       fprintf(stderr,"%lu->%s\n",ii,ret[ii]);
+       fprintf(stderr,"%zu->%s\n",ii,ret[ii]);
      fprintf(stderr,"\n");
 #endif
   }
@@ -490,12 +490,12 @@ double *angsd::readDouble(const char*fname,int hint){
   //  fprintf(stderr,"size of prior=%lu\n",res.size());
   if(hint!=res.size()){
     fprintf(stderr,"problem with size of dimension of prior %d vs %lu\n",hint,res.size());
-    for(uint i=0;i<res.size();i++)
-      fprintf(stderr,"%d=%f\n",i,res[i]);
+    for(size_t i=0;i<res.size();i++)
+      fprintf(stderr,"%zu=%f\n",i,res[i]);
     exit(0);
   }
   double *ret = new double[res.size()];
-  for(uint i=0;i<res.size();i++)
+  for(size_t i=0;i<res.size();i++)
     ret[i] = res[i];
   fclose(fp);
   return ret;
