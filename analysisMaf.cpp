@@ -75,6 +75,10 @@ void frequency::printArg(FILE *argFile){
   fprintf(argFile,"\t-anc\t%s\n",ancName);
   fprintf(argFile,"\t-doZ\t%d\n",doZ);
   fprintf(argFile,"\t-eps\t%f [Only used for -doMaf &32]\n",eps);
+  fprintf(argFile,"-doPost\t%d\t(Calculate posterior prob 3xgprob)\n",doPost);
+  fprintf(argFile,"\t1: Using frequency as prior\n");
+  fprintf(argFile,"\t1: Using uniform prior\n");
+  fprintf(argFile,"-beagleProb\t%d\n",beagleProb);
   fprintf(argFile,"NB these frequency estimators requires major/minor -doMajorMinor\n");
   fprintf(argFile,"\n");
 
@@ -141,6 +145,7 @@ void frequency::getOptions(argStruct *arguments){
   int doCounts =0;
   doCounts=angsd::getArg("-doCounts",doCounts,arguments);
 
+  beagleProb=angsd::getArg("-beagleProb",beagleProb,arguments);
 
   if(doMaf==0)
     return;
@@ -173,21 +178,28 @@ void frequency::getOptions(argStruct *arguments){
     fprintf(stderr,"Must supply -doCounts for MAF estimator based on counts\n");
     exit(0);
   }
-
+  if(beagleProb && doPost==0){
+    fprintf(stderr,"Must supply -doPost 1 to write beaglestyle postprobs\n");
+    exit(0);
+  }
 
 }
 
 //constructor
 frequency::frequency(const char *outfiles,argStruct *arguments,int inputtype){
   inputIsBeagle =0;
-  
+  beagleProb = 0; //<-output for beagleprobs
   filtLrt=filtMaf =0;
   minMaf =0.01;
   minLRT =24;
   nInd = arguments->nInd;
   eps = 0.001;
   doZ =0;
-  outfile = Z_NULL;
+  outfile = NULL;
+  outfileZ2 = Z_NULL;
+  outfileZ = Z_NULL;
+  outfile2 = NULL;
+  
   doMaf=0;
   GL=0;
   doSNP=0;
@@ -221,6 +233,15 @@ frequency::frequency(const char *outfiles,argStruct *arguments,int inputtype){
   }else{
     postfix=".mafs";
     outfile = openFile(outfiles,postfix);
+  }
+  if(beagleProb){
+    if(doZ==1){
+      postfix=".beagle.gprobs.gz";
+      outfileZ2 = openFileGz(outfiles,postfix,"w6h");
+    }else{
+      postfix=".beagle.gprobs";
+      outfile2 = openFile(outfiles,postfix);
+    }
   }
   //print header
   kstring_t bufstr;
@@ -259,18 +280,37 @@ frequency::frequency(const char *outfiles,argStruct *arguments,int inputtype){
     gzwrite(outfileZ,bufstr.s,bufstr.l);
   else
     fprintf(outfile,"%s",bufstr.s);
+  bufstr.l=0;
+  if(beagleProb){
+    kputs("marker\tallele1\tallele2",&bufstr);
+    for(int i=0;i<arguments->nInd;i++){
+      kputs("\tInd",&bufstr);
+      kputw(i,&bufstr);
+      kputs("\tInd",&bufstr);
+      kputw(i,&bufstr);
+      kputs("\tInd",&bufstr);
+      kputw(i,&bufstr);
+    }
+    kputc('\n',&bufstr);
+    if(doZ==1)
+      gzwrite(outfileZ2,bufstr.s,bufstr.l);
+    else
+      fprintf(outfile2,"%s",bufstr.s);
+  }
+
   free(bufstr.s);
 }
 
 
 frequency::~frequency(){
-  if(doMaf==0)
-    return;
-
-  if(doZ==1)
-    gzclose(outfileZ);
-  else
+  if(outfile2!=NULL)
+    fclose(outfile2);
+  if(outfile!=NULL)
     fclose(outfile);
+  if(outfileZ!=Z_NULL)
+    gzclose(outfileZ);
+  if(outfileZ2!=Z_NULL)
+    gzclose(outfileZ2);
 }
 
 void frequency::prepPrint(funkyPars *pars){
@@ -341,6 +381,39 @@ void frequency::print(funkyPars *pars) {
   free(bufstr->s);
   delete bufstr;
 
+  if(beagleProb){
+   
+    kstring_t bs;bs.s=NULL;bs.l=bs.m=0;
+    //beagle format
+    for(int s=0;s<pars->numSites;s++) {
+      bs.l = 0; //set tmpbuf beginning to zero
+      if(pars->keepSites[s]==0)
+	continue;
+      //	fprintf(stderr,"keepsites=%d\n",pars->keepSites[s]);
+      kputs(header->name[pars->refId],&bs);
+      kputc('_',&bs);
+      kputw(pars->posi[s]+1,&bs);
+      kputc('\t',&bs);
+      kputw(pars->major[s],&bs);
+      kputc('\t',&bs);
+      kputw(pars->minor[s],&bs);
+
+      int major = pars->major[s];
+      int minor = pars->minor[s];
+      assert(major!=4&&minor!=4);
+	
+      for(int i=0;i<3*pars->nInd;i++) {
+	ksprintf(&bs, "\t%f",pars->post[s][i]);
+      }
+      
+      kputc('\n',&bs);
+      if(outfile2!=NULL )
+	fprintf(outfile2,"%s",bs.s);
+      else
+	gzwrite(outfileZ2,bs.s,bs.l);
+    }
+    free(bs.s);
+  }
 }
 
 
@@ -363,6 +436,15 @@ void frequency::clean(funkyPars *pars) {
     delete [] pars->results->freq->pEMSNP;
     delete [] pars->results->freq->pEMunSNP;
   }
+
+  
+  if(pars->post!=NULL){
+    for(int i=0;i<pars->numSites;i++)
+      delete [] pars->post[i];
+    delete [] pars->post;
+  }
+
+
 }
 
 

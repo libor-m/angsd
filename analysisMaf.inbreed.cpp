@@ -381,6 +381,13 @@ void frequency::clean(funkyPars *pars) {
     delete [] pars->results->freq->pEMSNP;
     delete [] pars->results->freq->pEMunSNP;
   }
+
+  if(pars->post!=NULL){
+    for(int i=0;i<pars->numSites;i++)
+      delete [] pars->post[i];
+    delete [] pars->post;
+  }
+
 }
 
 

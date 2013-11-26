@@ -50,6 +50,7 @@ void callGenotypes::printArg(FILE *argFile){
   fprintf(argFile,"\t8: write the posterior probability of all possible genotypes\n");
   fprintf(argFile,"\t16: write the posterior probability of called gentype\n");
   fprintf(argFile,"\t32: write the posterior probability of called gentype as binary\n");
+  //  fprintf(argFile,"\t64: write the three posterior probability (Beagle style)\n");
   fprintf(argFile,"\t-> A combination of the above can be choosen by summing the values, EG write 0,1,2 types with majorminor as -doGeno 3\n");
   fprintf(argFile,"\t-postCutoff=%f\t(-1 indicates no cutof)\n",postCutoff);
 

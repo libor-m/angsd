@@ -14,6 +14,10 @@ private:
 
   gzFile outfileZ;
   FILE *outfile;
+
+  gzFile outfileZ2;
+  FILE *outfile2;
+
   //none optional stuff
   //FILE *outfile;
   int doMaf;
@@ -27,7 +31,7 @@ private:
   double minLRT;
   int filtMaf;
   int filtLrt;
-
+  int beagleProb;
 
   //do gz compression on the fly
   int doZ;

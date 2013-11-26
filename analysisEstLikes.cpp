@@ -308,11 +308,6 @@ void likeClass::clean(funkyPars *pars){
       delete [] pars->likes[i];
     delete [] pars->likes;
   }
-  if(pars->post!=NULL){
-    for(int i=0;i<pars->numSites;i++)
-      delete [] pars->post[i];
-    delete [] pars->post;
-  }
   
 }
 
