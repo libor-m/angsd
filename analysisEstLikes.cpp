@@ -56,7 +56,6 @@ private:
   int trim;
 
   
-  FILE *outfile;
   gzFile gzoutfile;
   int GL;
   int doGlf;
@@ -189,7 +188,7 @@ void likeClass::getOptions(argStruct *arguments){
 
 likeClass::likeClass(const char *outfiles,argStruct *arguments,int inputtype){
   
-  postfix = ".glf";
+  postfix = ".glf.gz";
   beaglepostfix = ".beagle.gz";
   
 
@@ -199,7 +198,7 @@ likeClass::likeClass(const char *outfiles,argStruct *arguments,int inputtype){
   errorFname = NULL;
   errorProbs = NULL;
   GL=0;
-  minQ = 13;
+  minQ = MINQ;//<- general.h
   minInd=0;
   angsd_tmpdir = strdup("angsd_tmpdir");
   
@@ -246,16 +245,15 @@ likeClass::likeClass(const char *outfiles,argStruct *arguments,int inputtype){
     errorProbs = error::generateErrorPointers(errors,3,4);
   }
   
-  outfile = NULL;
   gzoutfile = Z_NULL;
   bufstr.s=NULL; bufstr.l=bufstr.m=0;// <- used for buffered output 
   bufstr.l=0;
   if(doGlf){
  
     if(doGlf!=2)
-      outfile = openFile(outfiles,postfix);
+      gzoutfile = openFileGz(outfiles,postfix,GZOPT);
     else{
-      gzoutfile = openFileGz(outfiles,beaglepostfix,"w6h");
+      gzoutfile = openFileGz(outfiles,beaglepostfix,GZOPT);
       
       kputs("marker\tallele1\tallele2",&bufstr);
       for(int i=0;i<arguments->nInd;i++){
@@ -288,14 +286,9 @@ likeClass::~likeClass(){
   else if(GL==4)
     error::killGlobalErrorProbs(errorProbs);
   if(doGlf)//filehandle is only open if we want to print GL
-    //  fprintf(stderr,"outfile=%p\n",outfile);
-    if(outfile!=NULL)
-      fclose(outfile);
-    else{
-      //fprintf(stderr,"calling gzclose\n");
-      gzclose(gzoutfile);
-    }
-
+    gzclose(gzoutfile);
+    
+  
   if(bufstr.s!=NULL)
     free(bufstr.s);
   
@@ -434,16 +427,16 @@ void likeClass::printLike(funkyPars *pars) {
     for(int i=0;i<pars->numSites;i++){
       if(pars->keepSites[i]==0)
 	continue;
-      fwrite(pars->likes[i],sizeof(double),10*pars->nInd,outfile);
+      gzwrite(gzoutfile,pars->likes[i],sizeof(double)*10*pars->nInd);
     }
   }
   else if(doGlf==2){
     //beagle format
+    bufstr.l = 0; //set tmpbuf beginning to zero
     for(int s=0;s<pars->numSites;s++) {
-      bufstr.l = 0; //set tmpbuf beginning to zero
       if(pars->keepSites[s]==0)
 	continue;
-      //	fprintf(stderr,"keepsites=%d\n",pars->keepSites[s]);
+      
       kputs(header->name[pars->refId],&bufstr);
       kputc('_',&bufstr);
       kputw(pars->posi[s]+1,&bufstr);
@@ -468,12 +461,11 @@ void likeClass::printLike(funkyPars *pars) {
       }
       
       kputc('\n',&bufstr);
-      if(outfile!=NULL )
-	fprintf(outfile,"%s",bufstr.s);
-      else
-	gzwrite(gzoutfile,bufstr.s,bufstr.l);
+
     }
-  } else if(doGlf==3) { //FGV v0.208 Aug,28
+    gzwrite(gzoutfile,bufstr.s,bufstr.l);
+  }
+  else if(doGlf==3) { //FGV v0.208 Aug,28
     for(int s=0;s<pars->numSites;s++) {
       if(pars->keepSites[s]==0) //TSK 0.441 sep 25
 	continue;
@@ -482,21 +474,30 @@ void likeClass::printLike(funkyPars *pars) {
       assert(major!=4&&minor!=4);
 
       for(int i=0;i<pars->nInd;i++) {
-	fwrite(&pars->likes[s][i*10+angsd::majorminor[major][major]], sizeof(double),1,outfile);
-	fwrite(&pars->likes[s][i*10+angsd::majorminor[major][minor]], sizeof(double),1,outfile);
-	fwrite(&pars->likes[s][i*10+angsd::majorminor[minor][minor]], sizeof(double),1,outfile);
+	double dump[3];
+	dump[0] = pars->likes[s][i*10+angsd::majorminor[major][major]] ;
+	dump[1] = pars->likes[s][i*10+angsd::majorminor[major][minor]] ;
+	dump[2] = pars->likes[s][i*10+angsd::majorminor[minor][minor]] ;
+	gzwrite(gzoutfile,dump,3*sizeof(double));
       }
     }
   } else if(doGlf==4){
+    bufstr.l=0;
     //otherwise print textoutput
     for(int s=0;s<pars->numSites;s++){
       if(pars->keepSites[s]==0)
 	continue;
-      fprintf(outfile,"%s\t%d\t",header->name[pars->refId],pars->posi[s]+1);
-      for(int i=0;i<10*pars->nInd-1;i++)
-	fprintf(outfile,"%f\t",pars->likes[s][i]);
-      fprintf(outfile,"%f\n",pars->likes[s][10*pars->nInd-1]);
+      kputs(header->name[pars->refId],&bufstr);
+      kputc('\t',&bufstr);
+      kputw(pars->posi[s]+1,&bufstr);
+      for(int i=0;i<10*pars->nInd;i++)      
+	ksprintf(&bufstr, "\t%f",pars->likes[s][i]);
+
+      kputc('\n',&bufstr);
     }
+    gzwrite(gzoutfile,bufstr.s,bufstr.l);
   }
+
+
 }
 

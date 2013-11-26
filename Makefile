@@ -40,7 +40,7 @@ baq_adjustMapQ.o: baq_adjustMapQ.cpp baq_adjustMapQ.h kprobaln.o
 
 
 
-general.o: general.cpp general.h shared.o analysisCovar.cpp analysisEstError.o analysisCallGenotypes.cpp  angsd_realSFS.cpp analysisEstLikes.cpp analysisMajorMinor.cpp getFasta.cpp analysisCount.cpp analysisAsso.cpp analysisFunction.o analysisKeepList.cpp  analysisKeepList.o thorfinn.o snpStat.cpp analysisHWE.cpp analysisAnsError.cpp getFasta.o snptools.cpp hetplas.cpp 
+general.o: general.cpp general.h shared.o analysisCovar.cpp analysisEstError.o analysisCallGenotypes.cpp  angsd_realSFS.cpp analysisEstLikes.cpp analysisMajorMinor.cpp getFasta.cpp analysisCount.cpp analysisAsso.cpp analysisFunction.o analysisKeepList.cpp  analysisKeepList.o thorfinn.o snpStat.o analysisHWE.o analysisAnsError.cpp getFasta.o snptools.cpp hetplas.cpp 
 	$(CXX) $(FLAGS) -c general.cpp
 
 
@@ -128,6 +128,12 @@ bammer_main.o : parseArgs_bambi.o bammer_main.cpp mUpPile.o bams.o kstring.o ind
 	$(CXX) bammer_main.cpp $(FLAGS) -c
 
 
+analysisHWE.o: analysisFunction.h shared.h analysisHWE.cpp analysisHWE.h
+	$(CXX) analysisHWE.cpp $(FLAGS) -c
+
+
+snpStat.o: analysisFunction.h shared.h snpStat.cpp snpStat.h analysisHWE.h
+	$(CXX) snpStat.cpp $(FLAGS) -c
 
 
 angsd: angsd.cpp shared.o bfgs.o multiReader.o printRes.o general.o soap_likes.o gatk_likes.o bam_likes.o bammer_main.o analysisFunction.o bgzf.o analysisMaf.o

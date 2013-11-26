@@ -65,7 +65,7 @@ void ansErr::getOptions(argStruct *arguments){
 
 ansErr::ansErr(const char *outfiles,argStruct *arguments,int inputtype){
   doAnsError=0;
-  minQ=0;
+  minQ=MINQ;//<-general.h
   sample=1;
   currentChr=-1;
   if(arguments->argc==2){

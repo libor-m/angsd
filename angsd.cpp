@@ -22,7 +22,7 @@
 #include "shared.h"
 #include "multiReader.h"
 #include "mrStruct.h"
-#define VERSION 0.543
+#define VERSION 0.548
 #define ARGS ".arg"
 
 #include "parseArgs_bambi.h"

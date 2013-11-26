@@ -10,6 +10,10 @@
 
 */
 
+#include <zlib.h>
+#include "kstring.h"
+
+
 
 class countCls : public general{
 private:
@@ -18,23 +22,22 @@ private:
   const char* postfix3;//.qs
   const char* postfix4;//.depthSample
   const char* postfix5;//.depthGlobal
+  char *oFiles;
   int dumpCounts;
   int doCounts;
   int doQsDist;//0=nothing 1=overall 
-  //
 
-  FILE *oFileCountsBin;
-  FILE *oFileCountsPos;
-  FILE *oFileQs;
+  kstring_t bpos;
+  kstring_t bbin;
 
-  FILE *oFileGlobDepth;
-  FILE *oFileSamplDepth;
-
+  gzFile oFileCountsBin;
+  gzFile oFileCountsPos;
+ 
   size_t *qsDist;
   int nInd;
   int minInd;
   int minQ;
-   int trim;
+  int trim;
   int setMaxDepth;
   //from depth class
   int doDepth;
@@ -91,29 +94,32 @@ int calcSum(suint *counts,int len){
   return tmp;
 }
 
-void printCounts(char *chr,int *posi,suint **counts,int nSites,size_t nInd,FILE *oFileCountsPos,FILE *oFileCountsBin,int dumpType,int *keepSites){
+void printCounts(char *chr,int *posi,suint **counts,int nSites,size_t nInd,kstring_t &bpos,kstring_t &bbin,int dumpType,int *keepSites){
+  bpos.l=bbin.l=0;
+
   for(int s=0;s<nSites;s++){
     if(keepSites[s]==0)
       continue;
-    fprintf(oFileCountsPos,"%s\t%d\t%d\n",chr,posi[s]+1,calcSum(counts[s],4*nInd));
+    ksprintf(&bpos, "%s\t%d\t%d\n",chr,posi[s]+1,calcSum(counts[s],4*nInd));
     
     //if we need per sample info
-    if(oFileCountsBin) {
+    if(dumpType>1) {
       if(dumpType==4)//count A,C,G,T
 	for(int i=0;i<4*nInd;i++)
-	  fprintf(oFileCountsBin,"%u\t",counts[s][i]);
+	  ksprintf(&bbin,"%u\t",counts[s][i]);
       else if(dumpType==2){//print A+C+G+T
 	for(int n=0;n<nInd;n++)
-	  fprintf(oFileCountsBin,"%u\t",counts[s][n*4]+counts[s][n*4+1]+counts[s][n*4+2]+counts[s][n*4+3]);
+	  ksprintf(&bbin,"%u\t",counts[s][n*4]+counts[s][n*4+1]+counts[s][n*4+2]+counts[s][n*4+3]);
       }else{//overall sum of A,C,G,T
 	size_t tsum[4]={0,0,0,0};
 	for(int i=0;i<4*nInd;i++)
 	  tsum[i%4] +=counts[s][i];
-	fprintf(oFileCountsBin,"%zu\t%zu\t%zu\t%zu",tsum[0],tsum[1],tsum[2],tsum[3]);
+	ksprintf(&bbin,"%zu\t%zu\t%zu\t%zu",tsum[0],tsum[1],tsum[2],tsum[3]);
       }
-      fprintf(oFileCountsBin,"\n");	
+      kputc('\n',&bbin);	
     }
   }
+
 }
 
 
@@ -158,18 +164,19 @@ countCls::countCls(const char *outfiles,argStruct *arguments,int inputtype){
   dumpCounts =0;
   doCounts = 0;
   doQsDist = 0;
-  minQ =13;
+  minQ = MINQ;//<- general.h
   doDepth = 0;
   maxDepth = 100;
   setMaxDepth = -1;
   
   //make output files
-  postfix1=".pos";
-  postfix2=".counts";
+  postfix1=".pos.gz";
+  postfix2=".counts.gz";
   postfix3=".qs";
   postfix4=".depthSample";
   postfix5=".depthGlobal";
-
+  bpos.s=NULL;bpos.l=bpos.m=0;
+  bbin.s=NULL;bbin.l=bbin.m=0;
 
   //from command line
   if(arguments->argc==2){
@@ -181,25 +188,27 @@ countCls::countCls(const char *outfiles,argStruct *arguments,int inputtype){
   }
 
   getOptions(arguments);
+  oFiles=strdup(outfiles);
   printArg(arguments->argumentFile);
   
-  oFileCountsPos = oFileCountsBin = oFileQs = NULL;
+  //  oFileCountsPos = oFileCountsBin = oFileQs = NULL;
+  oFileCountsPos = oFileCountsBin =  Z_NULL;
 
   if(dumpCounts){
-    oFileCountsPos=openFile(outfiles,postfix1);
-    fprintf(oFileCountsPos,"chr\tpos\ttotDepth\n");
+    oFileCountsPos = openFileGz(outfiles,postfix1,GZOPT);
+    gzprintf(oFileCountsPos,"chr\tpos\ttotDepth\n");
     if(dumpCounts>1)
-      oFileCountsBin = openFile(outfiles,postfix2);
+      oFileCountsBin = openFileGz(outfiles,postfix2,GZOPT);
     if(dumpCounts==2)
       for(int i=0;i<arguments->nInd;i++)
-	fprintf(oFileCountsBin,"ind%dTotDepth\t",i);
+	gzprintf(oFileCountsBin,"ind%dTotDepth\t",i);
     if(dumpCounts==3)
-      fprintf(oFileCountsBin,"totA\ttotC\ttotG\ttotT");
+      gzprintf(oFileCountsBin,"totA\ttotC\ttotG\ttotT");
     if(dumpCounts==4)
       for(int i=0;i<arguments->nInd;i++)
-	fprintf(oFileCountsBin,"ind%d_A\tind%d_C\tind%d_G\tind%d_T\t",i,i,i,i);
+	gzprintf(oFileCountsBin,"ind%d_A\tind%d_C\tind%d_G\tind%d_T\t",i,i,i,i);
     if(dumpCounts>1)
-      fprintf(oFileCountsBin,"\n");
+      gzprintf(oFileCountsBin,"\n");
     
   }
 
@@ -208,8 +217,7 @@ countCls::countCls(const char *outfiles,argStruct *arguments,int inputtype){
     qsDist = new size_t[256];
     memset(qsDist,0,256*sizeof(size_t));
     //prepare outputfile
-    oFileQs = openFile(outfiles,postfix3);
-    fprintf(oFileQs,"qscore\tcounts\n");
+    
   }
   if(doDepth){
     depthCount=new size_t *[arguments->nInd];
@@ -222,8 +230,7 @@ countCls::countCls(const char *outfiles,argStruct *arguments,int inputtype){
     globCount = new size_t[maxDepth+1];
     memset(globCount,0,sizeof(size_t)*(maxDepth+1));
 
-    oFileSamplDepth = openFile(outfiles,postfix4);
-    oFileGlobDepth = openFile(outfiles,postfix5);
+    
   }
   
 }
@@ -249,17 +256,22 @@ void printQs(FILE *fp,size_t *ary){
 
 
 countCls::~countCls(){
-  if(oFileCountsBin)
-    fclose(oFileCountsBin);
-  if(oFileCountsPos)
-    fclose(oFileCountsPos);
+  if(oFileCountsBin!=Z_NULL)
+    gzclose(oFileCountsBin);
+  if(oFileCountsPos!=Z_NULL)
+    gzclose(oFileCountsPos);
   if(doQsDist){
+    FILE *oFileQs = openFile(oFiles,postfix3);
+    fprintf(oFileQs,"qscore\tcounts\n");
     printQs(oFileQs,qsDist);
     fclose(oFileQs);
     delete[] qsDist;
+
   }
 
   if(doDepth){
+    FILE *oFileSamplDepth = openFile(oFiles,postfix4);
+    FILE *oFileGlobDepth = openFile(oFiles,postfix5);
     for(int i=0;i<nInd;i++){
       for(int j=0;j<maxDepth+1;j++){
 	fprintf(oFileSamplDepth,"%lu\t",depthCount[i][j]);
@@ -281,7 +293,9 @@ countCls::~countCls(){
     fclose(oFileGlobDepth);
   }
 
-
+  free(oFiles);
+  free(bpos.s);
+  free(bbin.s);
 }
 
 void countQs(const chunkyT *chk,size_t *ret,int minQ,int trim,int *keepSites){
@@ -309,7 +323,9 @@ void countQs(const chunkyT *chk,size_t *ret,int minQ,int trim,int *keepSites){
 void countCls::print(funkyPars *pars){
 
   if(dumpCounts)
-    printCounts(header->name[pars->refId],pars->posi,pars->counts,pars->numSites,pars->nInd,oFileCountsPos,oFileCountsBin,dumpCounts,pars->keepSites);
+    printCounts(header->name[pars->refId],pars->posi,pars->counts,pars->numSites,pars->nInd,bpos,bbin,dumpCounts,pars->keepSites);
+  gzwrite(oFileCountsBin,bbin.s,bbin.l);
+  gzwrite(oFileCountsPos,bpos.s,bpos.l);
 
   if(doQsDist)
     countQs(pars->chk,qsDist,minQ,trim,pars->keepSites);

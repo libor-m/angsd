@@ -90,9 +90,10 @@ void filt_gen(const char *fname,std::map<char*,int,ltstr>* revMap,aHead *hd){
   
   gzFile gz = Z_NULL;
   gz = gzopen(fname,"r");
-  assert(gz!=Z_NULL);
-
-
+  if(gz==Z_NULL){
+    fprintf(stderr,"Problem opening file:%s\n",fname);
+    exit(0);
+  }
 
   char* outnames_bin = append(fname,BIN);
   char* outnames_idx = append(fname,IDX);

@@ -14,7 +14,7 @@
 typedef unsigned int suint;
 
 #define LENS 10000
-
+#define GZOPT "w6h"
 // struct for covar class - classy
 
 

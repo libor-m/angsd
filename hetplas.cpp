@@ -1,7 +1,7 @@
 #include "analysisFunction.h"
 #include "shared.h"
-
-#define MAX_QS 110
+#include <ctype.h>
+#define MAX_QS 500
 
 
 static size_t fullDist[MAX_QS][MAX_QS][2];//<-strand
@@ -168,6 +168,7 @@ void hetplas::calcQsDists(int major,size_t *qsMajor,size_t *qsMinor,size_t *majP
     if(refToInt[tn->seq[l]]!=4&&tn->qs[l]>=minQ){
       if(oBase==major){
 	qsMajor[tn->qs[l]]++;
+	//fprintf(stderr,"%d\n",tn->posi[l]);
 	majPosi[tn->posi[l]]++;
       }else{
 	qsMinor[tn->qs[l]]++;

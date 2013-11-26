@@ -10,15 +10,18 @@
   DRAGON positions are not offset correctly
 */
 #include <cmath>
-
+#include <zlib.h>
+#include "kstring.h"
 #include "shared.h"
 #include "analysisFunction.h"
 
 
 class asso:public general{
+private:
+  kstring_t bufstr;
 public:
   //none optional stuff
-  FILE **MultiOutfile;
+  gzFile *MultiOutfile;
   int doPrint;
   int minCov; //not for users
   int doMaf;
@@ -131,7 +134,7 @@ void asso::getOptions(argStruct *arguments){
 }
  
 asso::asso(const char *outfiles,argStruct *arguments,int inputtype){
-
+  bufstr.s=NULL;bufstr.l=bufstr.m=0;
   //default
   model=1;
   doPrint=0;
@@ -194,7 +197,7 @@ asso::asso(const char *outfiles,argStruct *arguments,int inputtype){
   }
 
   //make output files
-  MultiOutfile = new FILE*[ymat.y];
+  MultiOutfile = new gzFile[ymat.y];
   const char* postfix;
   postfix=".lrt";
 
@@ -261,16 +264,16 @@ asso::asso(const char *outfiles,argStruct *arguments,int inputtype){
   //open outfiles
   for(int i=0;i<ymat.y;i++){
     char ary[5000];
-    snprintf(ary,5000,"%s%d",postfix,i);
-    MultiOutfile[i] = openFile(outfiles,ary);
+    snprintf(ary,5000,"%s%d.gz",postfix,i);
+    MultiOutfile[i] = openFileGz(outfiles,ary,GZOPT);
   }
 
   //print header
   for(int yi=0;yi<ymat.y;yi++){
     if(doAsso==2)
-      fprintf(MultiOutfile[yi],"Chromosome\tPosition\tMajor\tMinor\tFrequency\tN\tLRT\thighHe\thighHo\n");
+      gzprintf(MultiOutfile[yi],"Chromosome\tPosition\tMajor\tMinor\tFrequency\tN\tLRT\thighHe\thighHo\n");
     else
-      fprintf(MultiOutfile[yi],"Chromosome\tPosition\tMajor\tMinor\tFrequency\tLRT\n");
+      gzprintf(MultiOutfile[yi],"Chromosome\tPosition\tMajor\tMinor\tFrequency\tLRT\n");
   }
 }
 
@@ -283,7 +286,7 @@ asso::~asso(){
   if(doAsso==0)
     return;
   for(int i=0;i<ymat.y;i++)
-    fclose(MultiOutfile[i]);
+    gzclose(MultiOutfile[i]);
   delete [] MultiOutfile;
 
   if(covfile!=NULL)
@@ -968,18 +971,20 @@ void asso::printDoAsso(funkyPars *pars){
   if(doPrint)
     fprintf(stderr,"staring [%s]\t[%s]\n",__FILE__,__FUNCTION__);
 
-  for(int yi=0;yi<ymat.y;yi++)
+  for(int yi=0;yi<ymat.y;yi++){
+    bufstr.l=0;
     for(int s=0;s<pars->numSites;s++){
       if(pars->keepSites[s]==0){//will skip sites that have been removed      
 	continue;
      } 
       if(doAsso==2){
-	//fprintf(MultiOutfile[yi],"%s\t%d\t%d\t%d\t%f\t%d\t%f\t%d\t%d\n",pars->sites[s].chromo,pars->sites[s].position,pars->major[s],pars->minor[s],pars->results->asso->freq[s],pars->results->asso->keepInd[yi][s],pars->results->asso->stat[yi][s],pars->results->asso->highHe[s],pars->results->asso->highHo[s]);
-	fprintf(MultiOutfile[yi],"%s\t%d\t%c\t%c\t%f\t%d\t%f\t%d\t%d\n",header->name[pars->refId],pars->posi[s]+1,intToRef[pars->major[s]],intToRef[pars->minor[s]],pars->results->asso->freq[s],pars->results->asso->keepInd[yi][s],pars->results->asso->stat[yi][s],pars->results->asso->highHe[s],pars->results->asso->highHo[s]);
+	ksprintf(&bufstr,"%s\t%d\t%c\t%c\t%f\t%d\t%f\t%d\t%d\n",header->name[pars->refId],pars->posi[s]+1,intToRef[pars->major[s]],intToRef[pars->minor[s]],pars->results->asso->freq[s],pars->results->asso->keepInd[yi][s],pars->results->asso->stat[yi][s],pars->results->asso->highHe[s],pars->results->asso->highHo[s]);
+	//	fprintf(MultiOutfile[yi],"%s\t%d\t%c\t%c\t%f\t%d\t%f\t%d\t%d\n",header->name[pars->refId],pars->posi[s]+1,intToRef[pars->major[s]],intToRef[pars->minor[s]],pars->results->asso->freq[s],pars->results->asso->keepInd[yi][s],pars->results->asso->stat[yi][s],pars->results->asso->highHe[s],pars->results->asso->highHo[s]);
       }else{
-	fprintf(MultiOutfile[yi],"%s\t%d\t%c\t%c\t%f\t%f\n",header->name[pars->refId],pars->posi[s]+1,intToRef[pars->major[s]],intToRef[pars->minor[s]],pars->results->asso->freq[s],pars->results->asso->stat[yi][s]);
-	//fprintf(MultiOutfile[yi],"%s\t%d\t%d\t%d\t%f\t%f\n",pars->sites[s].chromo,pars->sites[s].position,pars->major[s],pars->minor[s],pars->results->asso->freq[s],pars->results->asso->stat[yi][s]);
+	ksprintf(&bufstr,"%s\t%d\t%c\t%c\t%f\t%f\n",header->name[pars->refId],pars->posi[s]+1,intToRef[pars->major[s]],intToRef[pars->minor[s]],pars->results->asso->freq[s],pars->results->asso->stat[yi][s]);
+	//	fprintf(MultiOutfile[yi],"%s\t%d\t%c\t%c\t%f\t%f\n",header->name[pars->refId],pars->posi[s]+1,intToRef[pars->major[s]],intToRef[pars->minor[s]],pars->results->asso->freq[s],pars->results->asso->stat[yi][s]);
       }
     }
-  
+    gzwrite(MultiOutfile[yi],bufstr.s,bufstr.l);
+  }
 }

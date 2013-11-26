@@ -13,10 +13,7 @@ private:
   void prepPrint(funkyPars *pars);
 
   gzFile outfileZ;
-  FILE *outfile;
-
   gzFile outfileZ2;
-  FILE *outfile2;
 
   //none optional stuff
   //FILE *outfile;
@@ -33,8 +30,6 @@ private:
   int filtLrt;
   int beagleProb;
 
-  //do gz compression on the fly
-  int doZ;
   int inputIsBeagle;
 public:
   static double *indF;

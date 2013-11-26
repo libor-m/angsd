@@ -7,38 +7,12 @@
   part of angsd
 
  */
-
-#include "shared.h"
 #include <cmath>
+#include "shared.h"
+
 #include "analysisFunction.h"
-
-
-typedef struct {
-  double *freq;
-  double *F;
-}funkyHWE;
-
-
-class hwe:public general{
-public:
-  int doHWE;
-  //none optional stuff
-  FILE *outfile;
-  hwe(const char *outfiles,argStruct *arguments,int inputtype);
-  ~hwe();
-  void getOptions(argStruct *arguments);
-  void run(funkyPars  *pars);
-  void clean(funkyPars *pars);
-  void print(funkyPars *pars);
-  void printArg(FILE *argFile);
-
-  void estHWE(double *x,double *loglike,int nInd);
-  double HWE_like(double *x,double *loglike,int nInd);
-  void HWE_EM(double *x,double *loglike,int nInd);
-  void HWE_EM2(double *x,double *loglike,int nInd);
-
-};
-
+#include "general.h"
+#include "analysisHWE.h"
 
 void hwe::printArg(FILE *argFile){
   fprintf(argFile,"-------------\n%s:\n",__FILE__);
@@ -91,11 +65,12 @@ hwe::hwe(const char *outfiles,argStruct *arguments,int inputtype){
 
   //make output files
   const char* postfix;
-  postfix=".hwe";
-  outfile = openFile(outfiles,postfix);
-
-  //print header
-  fprintf(outfile,"chromo\tposition\tmajor\tminor\tfreq\thweFreq\tF\n");
+  postfix=".hwe.gz";
+  if(doHWE>0){
+    outfileZ = openFileGz(outfiles,postfix,GZOPT);
+    //print header
+    gzprintf(outfileZ,"Chromo\tPosition\tMajor\tMinor\tFreq\thweFreq\tF\tLRT\n");
+  }
 }
 
 
@@ -103,8 +78,8 @@ hwe::~hwe(){
 
   if(doHWE==0)
     return;
-
-  fclose(outfile);
+  if(doHWE>0)
+    gzclose(outfileZ);
 }
 
 
@@ -115,12 +90,14 @@ void hwe::clean(funkyPars *pars){
   funkyHWE *hweStruct =(funkyHWE *) pars->extras[index];
   delete[] hweStruct->freq;
   delete[] hweStruct->F;
+  delete[] hweStruct->like0;
+  delete[] hweStruct->likeF;
   delete hweStruct;
   
 }
 
 void hwe::print(funkyPars *pars){
-  if(doHWE==0)
+  if(doHWE<=0)
     return;
 
   funkyHWE *hweStruct = (funkyHWE *) pars->extras[index];//new
@@ -128,7 +105,7 @@ void hwe::print(funkyPars *pars){
   for(int s=0;s<pars->numSites;s++){
     if(pars->keepSites[s]==0) 
       continue;
-    fprintf(outfile,"%s\t%d\t%c\t%c\t%f\t%f\t%f\n",header->name[pars->refId],pars->posi[s]+1,intToRef[pars->major[s]],intToRef[pars->minor[s]],pars->results->asso->freq[s],hweStruct->freq[s],hweStruct->F[s]);
+    gzprintf(outfileZ,"%s\t%d\t%c\t%c\t%f\t%f\t%f\t%f\n",header->name[pars->refId],pars->posi[s]+1,intToRef[pars->major[s]],intToRef[pars->minor[s]],pars->results->asso->freq[s],hweStruct->freq[s],hweStruct->F[s],2*hweStruct->like0[s]-2*hweStruct->likeF[s]);
 
   }
 
@@ -145,6 +122,8 @@ void hwe::run(funkyPars *pars){
 
   double *freq = new double[pars->numSites];
   double *F = new double[pars->numSites];
+  double *like0 = new double[pars->numSites];
+  double *likeF = new double[pars->numSites];
 
   double **loglike3;
   loglike3=angsd::get3likes(pars);
@@ -160,6 +139,10 @@ void hwe::run(funkyPars *pars){
     estHWE(x,loglike3[s],pars->nInd);
     freq[s]=x[0];
     F[s]=x[1];
+    likeF[s] = HWE_like(x,loglike3[s],pars->nInd);
+    x[1]=0.0;
+    x[0]=pars->results->asso->freq[s];
+    like0[s] = HWE_like(x,loglike3[s],pars->nInd);
     //    fprintf(stderr,"%f\t%f\n",x[0],x[1]);
     //fprintf(stderr,"%f\t%f\t%f\n",loglike3[s][0],loglike3[s][1],loglike3[s][2]);
 
@@ -171,6 +154,8 @@ void hwe::run(funkyPars *pars){
 
   hweStruct->freq=freq;
   hweStruct->F=F;
+  hweStruct->like0=like0;
+  hweStruct->likeF=likeF;
   pars->extras[index] = hweStruct;
 
 
@@ -227,53 +212,6 @@ void hwe::HWE_EM(double *x,double *loglike,int nInd){
 
 
 
-void hwe::HWE_EM2(double *x,double *loglike,int nInd){
-  double freq=x[0];
-  double F=x[1];
-  double p0=(pow(1-freq,2)+freq*(1-freq)*F);
-  double p1=(2*freq*(1-freq)-2*freq*(1-freq)*F);
-  double p2=(pow(freq,2)+freq*(1-freq)*F);
-
-  double freq2=0;
-  double F2=0;
-  double norm;
-  double E_aa=0;
-  double E_Aa=0;
-  double E_AA=0;
-
-  for(int i=0;i<nInd;i++){
-    norm=angsd::addProtect3(log(p0)+loglike[i*3+0],log(p1)+loglike[i*3+1],log(p2)+loglike[i*3+2]);
-    freq2+=exp(log(p1)+loglike[i*3+1]-norm)+exp(log(2)+log(p2)+loglike[i*3+2]-norm);
-
-    E_AA+=exp(log(p0)+loglike[i*3+0]-norm);
-    E_Aa+=exp(log(p1)+loglike[i*3+1]-norm);
-    E_aa+=exp(log(p2)+loglike[i*3+2]-norm);
-    //    fprintf(stderr,"Likes(AA,Aa,aa)={%f,%f,%f}, norm %f\n",loglike[i*3+0],loglike[i*3+1],loglike[i*3+2],norm);
-    //    fprintf(stderr,"E(AA,Aa,aa)={%f,%f,%f}\n",E_AA,E_Aa,E_aa);
-  }
-  //  fprintf(stderr,"TE(AA,Aa,aa)={%f,%f,%f}\n",E_AA,E_Aa,E_aa);
-  F2=( E_AA*((1-freq)*F)/((1-freq)*F+pow(1-freq,2)*(1-F))  +  E_aa*(freq*F)/(freq*F+pow(freq,2)*(1-F))) / (E_AA+E_Aa+E_aa);
-  if(F2<0)
-    F2=0;
-  
-  freq2=freq2/(2*nInd);
-
-  if(freq2<0.0001)
-    F2=0;
-  //    F2=0;
-  x[0]=freq2;
-  x[1]=F2;
-  
-  if(freq2>1.0000001){
-    fprintf(stderr,"something is wrong i HWE\t freq %f\n",freq2);
-    fflush(stderr);
-    exit(0);
-
-  }
-}
-
-
-
 double hwe::HWE_like(double *x,double *loglike,int nInd){
   double freq=x[0];
   double F=x[1];
@@ -288,34 +226,25 @@ double hwe::HWE_like(double *x,double *loglike,int nInd){
 
 void hwe::estHWE(double *x,double *loglike,int nInd){
   double l=HWE_like(x,loglike,nInd);
-  int iter=200;
+  int iter=50;
   double d=l;
   int printer=0;
   for(int i=0;i<iter;i++){
-    HWE_EM2(x,loglike,nInd);
+    HWE_EM(x,loglike,nInd);
     l=HWE_like(x,loglike,nInd);
     if(d>l+0.01){
-      fprintf(stderr,"d %f\tl %f\n",d,l);
+      //   fprintf(stderr,"d %f\tl %f\n",d,l);
       printer=1;
     }
     d=l;
   }
-  if(printer){
+  if(printer & 0){
     x[0]=0.05;
     x[1]=0.05;
     l=HWE_like(x,loglike,nInd);
     for(int i=0;i<iter;i++){
       fprintf(stderr,"like %d\t%f\tf %f\tF %f\t%d\n",i,l,x[0],x[1],nInd);
       HWE_EM(x,loglike,nInd);
-      l=HWE_like(x,loglike,nInd);
-    }
-
-    x[0]=0.05;
-    x[1]=0.05;
-    l=HWE_like(x,loglike,nInd);
-    for(int i=0;i<iter;i++){
-      fprintf(stderr,"like %d\t%f\tf %f\tF %f\t%d\n",i,l,x[0],x[1],nInd);
-      HWE_EM2(x,loglike,nInd);
       l=HWE_like(x,loglike,nInd);
     }
 

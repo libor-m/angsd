@@ -2,6 +2,8 @@
 #include "shared.h"
 #include "general.h"
 #include "analysisFunction.h" 
+
+
 //these are the major builtin analysis that angsd can perform
 #include "analysisKeepList.h"
 #include "analysisMajorMinor.cpp"
@@ -9,7 +11,7 @@
 #include "analysisEstError.h"
 #include "analysisEstLikes.cpp"
 #include "analysisAsso.cpp"
-#include "analysisHWE.cpp"
+#include "analysisHWE.h"
 #include "analysisAnsError.cpp"
 #include "analysisCallGenotypes.cpp"
 #include "getFasta.h"//for reading fasta; ancestral and refernce
@@ -19,7 +21,8 @@
 #include "analysisCovar.cpp" 
 
 #include "thorfinn.h"
-#include "snpStat.cpp"
+#include "snpStat.h"
+
 #include "snptools.cpp" //<-implemenation of some stuff from snptools. 
 #include "hetplas.cpp" //<-implementation of hetero plasmic
 int general::tot_index =0;

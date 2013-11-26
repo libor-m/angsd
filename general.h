@@ -1,4 +1,8 @@
 #pragma once
+//DEFAULT TRIMMING
+#define MINQ 13
+
+
 #include "shared.h"
 #include "bams.h"
 

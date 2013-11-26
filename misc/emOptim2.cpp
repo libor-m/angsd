@@ -915,6 +915,7 @@ int main_1dsfs(int argc,char **argv){
     for(int x=0;x<dim;x++)
       fprintf(stdout,"%f ",log(sfs[x]));
     fprintf(stdout,"\n");
+    fflush(stdout);
 #endif
   }
   dalloc(GL1,nSites);
