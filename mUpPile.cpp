@@ -1523,11 +1523,11 @@ int uppile(int show,int nThreads,bufReader *rd,int NLINES,int nFiles,std::vector
 	break;
       }else {
 	itrPos++;
-	fprintf(stderr,"region lookup %d/%lu\n",itrPos+1,regions.size());
-	fflush(stderr);
+	//fprintf(stderr,"region lookup %d/%lu\n",itrPos+1,regions.size());
+	//fflush(stderr);
 	setIterators(rd,regions[itrPos],nFiles,nThreads);
-	fprintf(stderr,"done region lookup %d/%lu\n",itrPos+1,regions.size());
-	fflush(stderr);
+	//fprintf(stderr,"done region lookup %d/%lu\n",itrPos+1,regions.size());
+	//fflush(stderr);
 
 	theRef = rd[0].it.tid;
 	

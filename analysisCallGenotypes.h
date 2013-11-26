@@ -12,7 +12,7 @@ private:
   int doGeno;
   float postCutoff;
   gzFile outfileZ;
-  
+  int geno_minDepth;
 public:
   callGenotypes(const char *outfiles,argStruct *arguments,int inputtype);
   ~callGenotypes();

@@ -5,7 +5,7 @@ FLAGS=-O3
 
 
 
-all: optimSFS supersim sfstools emOptim calcStat bgid emOptim2
+all: optimSFS supersim sfstools emOptim calcStat bgid emOptim2 msToGlf
 
 bfgs.o: bfgs.c bfgs.h
 	$(CC) $(FLAGS) -c bfgs.c
@@ -32,8 +32,14 @@ emOptim2: emOptim2.cpp
 	$(CXX) $(FLAGS) emOptim2.cpp bfgs.cpp -o emOptim2 -lz -lpthread
 
 
-bgid:	bgid5.cpp stats.cpp ../kstring.o ../bgzf.o
-	$(CXX) $(FLAGS) bgid5.cpp -I../  ../kstring.o ../bgzf.o ../knetfile.o -lz -o bgid
+bgid:	bgid6.cpp stats.cpp ../kstring.o ../bgzf.o
+	$(CXX) $(FLAGS) bgid6.cpp -I../  ../kstring.o ../bgzf.o ../knetfile.o -lz -o bgid
+
+
+
+msToGlf: msToGlf6.c
+	$(CC) $(FLAGS) msToGlf6.c -O3 -o msToGlf -std=gnu99 -lz -lm
+
 
 
 clean:

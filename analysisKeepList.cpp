@@ -33,7 +33,7 @@ char *append(const char *one,const char*two){
 
 
 filt *filt_read(const char *fname){
-  fprintf(stderr,"Reading binary representation:%s\n",fname);
+  fprintf(stderr,"\t->[%s] Reading binary representation:%s\n",__FILE__,fname);
   filt *ret = new filt;
   ret->bg =NULL;
   ret->fp =NULL;
@@ -71,7 +71,7 @@ filt *filt_read(const char *fname){
   //  fprintf(stderr,"nCols: %d\n",ret->nCols);
   for(it=ret->offs.begin();0&&it!=ret->offs.end();++it)
     fprintf(stderr,"id:%d offs:%zu len:%d\n",it->first,it->second.offs,it->second.len);
-  fprintf(stderr,"nChr: %zu loaded from binary filter file\n",ret->offs.size());
+  fprintf(stderr,"\t-> [%s] nChr: %zu loaded from binary filter file\n",__FILE__,ret->offs.size());
   if(ret->nCols==4)
     fprintf(stderr,"Filterfile contains major/minor information\n");
 
@@ -291,7 +291,7 @@ void filter::getOptions(argStruct *arguments){
   if(fname!=NULL)  
     fl = filt_init(fname,revMap,header);
   if(fl!=NULL)
-    fprintf(stderr,"-filter is still beta, use at own risk...\n");
+    fprintf(stderr,"\t-> [%s] -filter is still beta, use at own risk...\n",__FILE__);
 
 
   //1=bim 2=keep
@@ -378,7 +378,7 @@ void filter::readSites(int refId) {
     return;
   std::map<int,asdf_dats> ::iterator it = fl->offs.find(refId);
   if(it==fl->offs.end()){
-    fprintf(stderr,"Problem finding chrId: %d in index\n",refId);
+    fprintf(stderr,"[%s.%s():%d] Problem finding chrId: %d in indexed filtering file, consider running with '-r chr:' \n",__FILE__,__FUNCTION__,__LINE__,refId);
     exit(0);
   }
   bgzf_seek(fl->bg,it->second.offs,SEEK_SET);

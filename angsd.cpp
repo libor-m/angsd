@@ -18,11 +18,12 @@
 #include<cstdlib> //for exit()
 #include<cstdio> //for fprintf
 #include <signal.h>//for catching ctrl+c, allow threads to finish
+#include <libgen.h>//for checking if output dir exists 'dirname'
 
 #include "shared.h"
 #include "multiReader.h"
 #include "mrStruct.h"
-#define VERSION 0.549
+#define VERSION 0.551
 #define ARGS ".arg"
 
 #include "parseArgs_bambi.h"
@@ -49,7 +50,7 @@ void printTime(FILE *fp){
 void callBack_bambi(fcb *fff){
 
   if(fff==NULL){
-    fprintf(stderr,"SEnding NULL this is a killswitch");
+    //    fprintf(stderr,"SEnding NULL this is a killswitch");
     selector(NULL);//<-send NULL which acts as a killswitch
   }else{
     funkyPars *fp = allocFunkyPars();
@@ -108,7 +109,20 @@ void printProgInfo(FILE *fp){
 
 
 void parseArgStruct(argStruct *arguments){
-  fflush(stderr);
+  //validate that there are no duplicate parameters
+  for(int i=0;i<arguments->argc-1;i++) {
+    if(arguments->argv[i][0]=='-'){
+      for(int ii=i+1;ii<arguments->argc;ii++){
+	if(arguments->argv[ii][0]=='-'){
+	  if(0==strcmp(arguments->argv[i],arguments->argv[ii])){
+	    fprintf(stderr,"Duplicate parameter: %s  supplied, will exit\n",arguments->argv[i]);
+	    exit(0);
+	  }
+	}
+      }
+    }
+  }
+
   for(int i=1;i<arguments->argc;i++){
     if(arguments->usedArgs[i]==0){
       fprintf(stderr,"%d argument \t%s is unknown will exit\n",i,arguments->argv[i]);
@@ -120,6 +134,8 @@ void parseArgStruct(argStruct *arguments){
     fprintf(stderr,"\t-> Error: You must supply a -fai file such that we know the sizes of the genomes (version .4486)\n");
      exit(0);
   }
+
+
 }
 
 
@@ -183,6 +199,15 @@ argStruct *setArgStruct(int argc,char **argv) {
        arguments->outfiles = argv[argPos+1];
        arguments->usedArgs[argPos]=1;
        arguments->usedArgs[argPos+1]=1;
+     //check if folder exists, otherwise program crashes
+       char *dirNam2 = strdup(arguments->outfiles);
+       char *dirNam=dirname(dirNam2);
+       //       fprintf(stderr,"dirname: %s strlen(dirNam):%zu\n",dirNam,strlen(dirNam));
+       if(strlen(dirNam)>1 &&!fexists(dirNam)){
+	 fprintf(stderr,"\t Folder: \'%s\' doesn't exist, please create\n",dirNam);
+	 exit(0);
+       }
+       free(dirNam2);
      }
      else if(strcmp(argv[argPos],"-bam")==0||strcmp(argv[argPos],"-i")==0 ){
        if(argc==2)
@@ -439,7 +464,7 @@ void sendToSelector(mr::funkyPars *mfp,std::map<char *,int,ltstr> *revMap,int in
 
   
   //printout the filenames generated
-  fprintf(stderr,"\t->Output filenames:\n");
+  fprintf(stderr,"\t-> Output filenames:\n");
   for(int i=0;i<(int)dumpedFiles.size();i++){
     fprintf(stderr,"\t\t->\"%s\"\n",dumpedFiles[i]);
     fprintf(argFp,"\t\t->\"%s\"\n",dumpedFiles[i]);

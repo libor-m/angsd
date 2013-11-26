@@ -71,7 +71,7 @@ void realSFS::printArg(FILE *argFile){
   fprintf(argFile,"\t-fold\t\t\t%d (deprecated)\n",fold);
   fprintf(argFile,"\t-anc\t\t\t%s (ancestral fasta)\n",anc);
   fprintf(argFile,"\t-noTrans\t\t%d (remove transitions)\n",noTrans);
-  fprintf(argFile,"-\t-doSFS\t\t%d\t(Using genotype posteriors (untested))\n",doSFS);
+  fprintf(argFile,"\t-doSFS\t\t%d\t(Using genotype posteriors (untested))\n",doSFS);
   fprintf(argFile,"\t-pest\t\t\t%s (prior SFS)\n",pest);
   fprintf(argFile,"\n");
 
@@ -130,6 +130,16 @@ void realSFS::getOptions(argStruct *arguments){
   doThetas= angsd::getArg("-doThetas",doThetas,arguments);
   if(doRealSFS==0&&doThetas==0&&doSFS==0)
     return;
+  if(doThetas!=0&& doRealSFS==0){
+    fprintf(stderr,"\t Must estimate joint llh (-doRealSFS) when estimating thetas\n");
+    exit(0);
+  }
+
+
+  if(pest==NULL&& doThetas){
+    fprintf(stderr,"\t Must supply a sfs used as prior for estimating thetas\n");
+    exit(0);
+  }
 
   underFlowProtect=angsd::getArg("-underFlowProtect",underFlowProtect,arguments);
   fold=angsd::getArg("-fold",fold,arguments);
@@ -841,7 +851,7 @@ void realSFS::fin(funkyPars *pars,int index,double *prior,gzFile fpgz){
    if(r->oklist[i]==1){
      double *tmp = r->pLikes[id++];
      for(int ii=0;ii<2*pars->nInd+1;ii++)
-       tmp[ii] += log(prior[ii]); //take loglike from sfs, and add the logprior
+       tmp[ii] += prior[ii]; //take loglike from sfs, and add the logprior
    
      normalize_array2(tmp,2*pars->nInd+1);
 
